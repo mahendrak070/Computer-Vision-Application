@@ -7,7 +7,11 @@ from flask import Flask, render_template, request, jsonify, session, send_from_d
 from flask_cors import CORS
 import cv2
 import numpy as np
-import face_recognition
+try:
+    import face_recognition
+    FACE_RECOGNITION_AVAILABLE = True
+except ImportError:
+    FACE_RECOGNITION_AVAILABLE = False
 import os
 import json
 import sqlite3
@@ -136,6 +140,12 @@ def dashboard():
 @validate_request_json('username', 'email', 'image')
 def api_register():
     """Register new user with face encoding - PRODUCTION READY"""
+    if not FACE_RECOGNITION_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'message': 'Face recognition is not available. Please use dev-login for testing.'
+        }), 503
+    
     try:
         data = request.json
         username = data.get('username', '').strip()
@@ -245,6 +255,12 @@ def api_register():
 @validate_request_json('image')
 def api_login():
     """Login using face recognition - PRODUCTION READY"""
+    if not FACE_RECOGNITION_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'message': 'Face recognition is not available. Please use /dev-login for testing.'
+        }), 503
+    
     try:
         data = request.json
         image_data = data.get('image')
