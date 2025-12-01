@@ -1,6 +1,6 @@
 # Computer Vision Web Application
 
-**Live Demo:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
+**Live Demo:** [https://computervision.up.railway.app/](https://computervision.up.railway.app/)
 
 **Authors:** Mahendra Krishna Koneru and Sai Leenath Jampala
 
@@ -10,9 +10,9 @@ A production-ready web-based computer vision platform featuring real-time tracki
 
 ## 🚀 Quick Access
 
-**Live Application:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
+**Live Application:** [https://computervision.up.railway.app/](https://computervision.up.railway.app/)
 
-**Developer Login:** [https://web-production-217c2.up.railway.app/dev-login](https://web-production-217c2.up.railway.app/dev-login)
+**Developer Login:** [https://computervision.up.railway.app/dev-login](https://computervision.up.railway.app/dev-login)
 
 ---
 
@@ -66,7 +66,7 @@ A production-ready web-based computer vision platform featuring real-time tracki
 ## 🌐 Deployment
 
 **Platform:** Railway  
-**URL:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)  
+**URL:** [https://computervision.up.railway.app/](https://computervision.up.railway.app/)  
 **Status:** ✅ Live & Production Ready
 
 ### Auto-Deployment
@@ -130,7 +130,7 @@ http://localhost:5001
 **Access Methods:**
 
 1. **Developer Login** (Recommended)
-   - URL: [https://web-production-217c2.up.railway.app/dev-login](https://web-production-217c2.up.railway.app/dev-login)
+   - URL: [https://computervision.up.railway.app/dev-login](https://computervision.up.railway.app/dev-login)
    - One-click access to all modules
    - No registration required
 
@@ -276,7 +276,7 @@ Educational project by Mahendra Krishna Koneru and Sai Leenath Jampala (2025)
 
 ## 🌐 Links
 
-- **Live App:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
+- **Live App:** [https://computervision.up.railway.app/](https://computervision.up.railway.app/)
 - **GitHub:** [https://github.com/mahendrak070/Computer-Vision-Application](https://github.com/mahendrak070/Computer-Vision-Application)
 - **Railway Dashboard:** [https://railway.app](https://railway.app)
 
