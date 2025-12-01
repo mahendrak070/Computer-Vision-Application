@@ -9,6 +9,7 @@ import numpy as np
 import base64
 import io
 import os
+import gc
 from datetime import datetime
 from modules.module1_dimension import DimensionEstimator
 from modules.module2_template import TemplateMatchingModule, FourierRestoration, TemplateMatchingWithBlur
@@ -16,9 +17,33 @@ from modules.module3_features import (GradientComputation, EdgeDetection, Corner
                                        LaplacianOfGaussian, BoundaryDetection, ArucoSegmentation)
 from modules.module4_sift_stitching import SIFTFromScratch, ImageStitching
 from modules.module5_tracking import MarkerBasedTracker, MarkerlessTracker, ColorBasedTracker
-from modules.module7_pose_hand import PoseEstimation, HandTracking, StereoCalibration
+# Lazy import heavy Mediapipe modules
+pose_estimator = None
+hand_tracker = None
+stereo_calib = None
 
-# Initialize module instances
+def get_pose_estimator():
+    global pose_estimator
+    if pose_estimator is None:
+        from modules.module7_pose_hand import PoseEstimation
+        pose_estimator = PoseEstimation()
+    return pose_estimator
+
+def get_hand_tracker():
+    global hand_tracker
+    if hand_tracker is None:
+        from modules.module7_pose_hand import HandTracking
+        hand_tracker = HandTracking()
+    return hand_tracker
+
+def get_stereo_calib():
+    global stereo_calib
+    if stereo_calib is None:
+        from modules.module7_pose_hand import StereoCalibration
+        stereo_calib = StereoCalibration()
+    return stereo_calib
+
+# Initialize lightweight module instances
 dimension_estimator = DimensionEstimator()
 template_matcher = TemplateMatchingModule()
 fourier_restoration = FourierRestoration()
@@ -31,9 +56,6 @@ boundary_detector = BoundaryDetection()
 aruco_segmentation = ArucoSegmentation()
 segmentation = Segmentation()
 image_stitcher = ImageStitching()
-pose_estimator = PoseEstimation()
-hand_tracker = HandTracking()
-stereo_calib = StereoCalibration()
 
 # Tracking instances (stored per session)
 trackers = {}
@@ -318,15 +340,26 @@ def register_api_routes(app):
             
             print(f"[Module 4] Starting stitch with {len(images_data)} images")
             
-            # Decode images
+            # Decode images and resize if too large (memory optimization)
             images = []
             for i, img_data in enumerate(images_data):
                 try:
                     img = decode_image(img_data)
                     if img is None:
                         return jsonify({'success': False, 'message': f'Failed to decode image {i+1}'}), 400
+                    
+                    # Resize if too large to prevent OOM (Railway has limited RAM)
+                    h, w = img.shape[:2]
+                    max_dim = 1920
+                    if max(h, w) > max_dim:
+                        scale = max_dim / max(h, w)
+                        new_w, new_h = int(w * scale), int(h * scale)
+                        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                        print(f"[Module 4] Resized image {i+1}: {(h,w)} -> {img.shape}")
+                    else:
+                        print(f"[Module 4] Image {i+1}: {img.shape}")
+                    
                     images.append(img)
-                    print(f"[Module 4] Decoded image {i+1}: {img.shape}")
                 except Exception as e:
                     print(f"[Module 4] Error decoding image {i+1}: {str(e)}")
                     return jsonify({'success': False, 'message': f'Invalid image data at position {i+1}'}), 400
@@ -343,6 +376,11 @@ def register_api_routes(app):
             
             # Encode result
             encoded = encode_image(stitched, quality=90)
+            
+            # Free memory
+            del images
+            del stitched
+            gc.collect()
             
             return jsonify({
                 'success': True,
@@ -479,7 +517,7 @@ def register_api_routes(app):
             # Resize for faster processing
             image = resize_for_processing(image, max_width=960)
             
-            annotated, landmarks, pose_data = pose_estimator.process_frame(image)
+            annotated, landmarks, pose_data = get_pose_estimator().process_frame(image)
             
             # Add summary statistics
             summary = {
@@ -513,13 +551,13 @@ def register_api_routes(app):
             # Resize for faster processing
             image = resize_for_processing(image, max_width=960)
             
-            annotated, landmarks, hand_data = hand_tracker.process_frame(image)
+            annotated, landmarks, hand_data = get_hand_tracker().process_frame(image)
             
             # Detect gestures
             gesture = None
             num_hands = 0
             if landmarks and len(landmarks) > 0:
-                gesture = hand_tracker.detect_gestures(landmarks[0])
+                gesture = get_hand_tracker().detect_gestures(landmarks[0])
                 num_hands = len(landmarks)
             
             # Add summary statistics
@@ -554,7 +592,7 @@ def register_api_routes(app):
             # Ensure uploads directory exists
             os.makedirs('uploads', exist_ok=True)
             
-            success = pose_estimator.save_to_csv(filepath)
+            success = get_pose_estimator().save_to_csv(filepath)
             
             if success and os.path.exists(filepath):
                 return send_file(
@@ -582,7 +620,7 @@ def register_api_routes(app):
             # Ensure uploads directory exists
             os.makedirs('uploads', exist_ok=True)
             
-            success = hand_tracker.save_to_csv(filepath)
+            success = get_hand_tracker().save_to_csv(filepath)
             
             if success and os.path.exists(filepath):
                 return send_file(
@@ -604,8 +642,8 @@ def register_api_routes(app):
             return jsonify({'success': False, 'message': 'Not authenticated'}), 401
         
         try:
-            pose_estimator.reset_data()
-            hand_tracker.reset_data()
+            get_pose_estimator().reset_data()
+            get_hand_tracker().reset_data()
             return jsonify({'success': True, 'message': 'Data reset successfully'})
         except Exception as e:
             app.logger.error(f"Reset data error: {str(e)}")
