@@ -16,16 +16,16 @@
         <div class="section">
             <h2>Dimension Estimation</h2>
             <div class="info-box">
-                <strong>How it works:</strong> This module uses reference-based calibration to measure real-world dimensions. Lens distortion is automatically corrected using camera calibration data.
+                <strong>How it works:</strong> This module measures real-world dimensions using camera calibration and perspective projection. Lens distortion is automatically corrected.
                 <br><br>
                 <strong>Instructions:</strong>
                 <ol style="margin: 8px 0 0 20px; line-height: 1.8;">
                     <li>Upload an image - it will be automatically undistorted</li>
-                    <li><strong>FIRST:</strong> Click 2 points on a reference object with KNOWN size (e.g., 4-inch square side)</li>
-                    <li>Enter the actual length of that reference in "Reference Length (inches)"</li>
-                    <li>Click <strong>"Set Reference"</strong> to calibrate</li>
+                    <li><strong>FIRST:</strong> Click 2 points on an object with a known size (e.g., 4-inch square side)</li>
+                    <li>Enter the actual length in "Known Length (inches)"</li>
+                    <li>Click <strong>"Calibrate"</strong> to set the scale</li>
                     <li>Now click additional points to measure other distances (up to 4 points total)</li>
-                    <li>All measurements will be based on your reference calibration</li>
+                    <li>All measurements will be calculated based on the calibrated scale</li>
                     <li>Click Reset to start over</li>
                 </ol>
             </div>
@@ -48,11 +48,11 @@
                     <div class="stats">
                         <h3>Calibration</h3>
                         <div>
-                            <label>Reference Length (inches):</label>
+                            <label>Known Length (inches):</label>
                             <input type="number" id="referenceLength" value="4" min="0.1" step="0.1">
                         </div>
                         <div style="margin-top: 12px;">
-                            <button class="btn-primary" onclick="setReference()" id="setRefBtn" disabled>Set Reference</button>
+                            <button class="btn-primary" onclick="setReference()" id="setRefBtn" disabled>Calibrate</button>
                             <small style="display: block; margin-top: 8px; font-size: 11px; color: #64ffda;" id="calibStatus">Click 2 points first</small>
                         </div>
                         <div style="margin-top: 12px;">
@@ -224,7 +224,7 @@
             
             if (points.length === 2 && !isCalibrated) {
                 document.getElementById('setRefBtn').disabled = false;
-                document.getElementById('calibStatus').textContent = 'Ready! Click "Set Reference"';
+                document.getElementById('calibStatus').textContent = 'Ready! Click "Calibrate"';
                 document.getElementById('calibStatus').style.color = '#00f7ff';
             }
             
@@ -264,7 +264,7 @@
                 warningDiv.className = 'stat-item';
                 warningDiv.innerHTML = `
                     <span class="stat-label" style="color: #ff6b6b;">⚠ Not calibrated</span>
-                    <span class="stat-value">Set reference first</span>
+                    <span class="stat-value">Calibrate first</span>
                 `;
                 container.appendChild(warningDiv);
                 return;
