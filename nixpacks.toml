@@ -1,6 +1,6 @@
 [phases.setup]
 nixPkgs = ["python312", "gcc", "cmake", "mesa", "libGL", "glib", "xorg.libXext", "xorg.libSM", "xorg.libXrender", "libgomp"]
-aptPkgs = ["libgl1-mesa-glx", "libglib2.0-0", "libsm6", "libxext6", "libxrender-dev", "libgomp1"]
+aptPkgs = ["libgl1", "libglib2.0-0", "libsm6", "libxext6", "libxrender1", "libgomp1"]
 
 [phases.install]
 cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
