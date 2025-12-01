@@ -16,7 +16,11 @@
         <div class="section">
             <h2>Real-Time Tracking</h2>
             <div class="info-box">
-                <strong>AI-Powered:</strong> Real-time skeleton pose estimation (33 landmarks) and hand tracking (21 landmarks per hand) with CSV data export.
+                <strong>AI-Powered:</strong> Real-time skeleton pose estimation (33 landmarks) and hand tracking (21 landmarks per hand) with gesture recognition and detailed status display. All landmark data is logged for CSV export.
+                <br><br>
+                <strong>Pose Mode:</strong> Detects full body posture, estimates body position (standing/sitting), and tracks 33 key points including shoulders, hips, knees, ankles, wrists, and facial landmarks.
+                <br>
+                <strong>Hand Mode:</strong> Tracks up to 2 hands simultaneously, identifies left/right hands, recognizes gestures (fist, pointing, peace sign, open hand), and provides 21 landmarks per hand.
             </div>
 
             <div class="stats">
@@ -60,12 +64,48 @@
                     <span class="stat-value" id="frameCount">0</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">Detection Status:</span>
-                    <span class="stat-value" id="detectionStatus">Waiting...</span>
-                </div>
-                <div class="stat-item">
                     <span class="stat-label">Current FPS:</span>
                     <span class="stat-value" id="fpsDisplay">0</span>
+                </div>
+            </div>
+
+            <div class="stats" style="margin-top: 16px;">
+                <h3>Detection Status</h3>
+                <div class="stat-item">
+                    <span class="stat-label">Status:</span>
+                    <span class="stat-value" id="detectionStatus" style="font-weight: 600;">Waiting...</span>
+                </div>
+                <div id="poseDetails" style="display: none; margin-top: 12px; padding: 12px; background: rgba(100, 255, 218, 0.1); border-radius: 6px;">
+                    <div class="stat-item" style="margin-bottom: 8px;">
+                        <span class="stat-label">Landmarks Detected:</span>
+                        <span class="stat-value" id="landmarkCount">0</span>
+                    </div>
+                    <div class="stat-item" style="margin-bottom: 8px;">
+                        <span class="stat-label">Body Position:</span>
+                        <span class="stat-value" id="bodyPosition">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Visibility:</span>
+                        <span class="stat-value" id="visibility">-</span>
+                    </div>
+                </div>
+                <div id="handDetails" style="display: none; margin-top: 12px; padding: 12px; background: rgba(100, 255, 218, 0.1); border-radius: 6px;">
+                    <div class="stat-item" style="margin-bottom: 8px;">
+                        <span class="stat-label">Hands Detected:</span>
+                        <span class="stat-value" id="handCount">0</span>
+                    </div>
+                    <div class="stat-item" style="margin-bottom: 8px;">
+                        <span class="stat-label">Hand Type:</span>
+                        <span class="stat-value" id="handType">-</span>
+                    </div>
+                    <div class="stat-item" style="margin-bottom: 8px;">
+                        <span class="stat-label">Gesture:</span>
+                        <span class="stat-value" id="gesture" style="font-weight: 600; color: #64ffda;">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Landmarks:</span>
+                        <span class="stat-value" id="handLandmarkCount">0</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -239,17 +279,212 @@
         function updateStats(data, mode) {
             document.getElementById('frameCount').textContent = frameCount;
             
+            const status = document.getElementById('detectionStatus');
+            const poseDetails = document.getElementById('poseDetails');
+            const handDetails = document.getElementById('handDetails');
+            
             if (mode === 'pose') {
                 const detected = data.pose_detected || false;
-                const status = document.getElementById('detectionStatus');
-                status.textContent = detected ? 'Pose Detected' : 'No Pose';
-                status.style.color = detected ? '#64ffda' : '#ff5252';
+                
+                // Hide hand details, show pose details
+                handDetails.style.display = 'none';
+                poseDetails.style.display = detected ? 'block' : 'none';
+                
+                if (detected) {
+                    status.textContent = '✓ Pose Detected';
+                    status.style.color = '#64ffda';
+                    
+                    // Update pose details
+                    const poseData = data.pose_data || {};
+                    document.getElementById('landmarkCount').textContent = '33 landmarks';
+                    
+                    // Debug: log pose data structure (first time only)
+                    if (frameCount === 1) {
+                        console.log('Pose Data Structure:', Object.keys(poseData).slice(0, 10));
+                    }
+                    
+                    // Analyze body position based on landmark data
+                    let bodyPosition = 'Standing';
+                    let avgVisibility = 'Good';
+                    
+                    // Extract visibility info if available
+                    if (poseData && Object.keys(poseData).length > 0) {
+                        bodyPosition = estimateBodyPosition(poseData);
+                        avgVisibility = estimateVisibility(poseData);
+                    }
+                    
+                    document.getElementById('bodyPosition').textContent = bodyPosition;
+                    document.getElementById('visibility').textContent = avgVisibility;
+                } else {
+                    status.textContent = '✗ No Pose Detected';
+                    status.style.color = '#ff5252';
+                }
             } else {
                 const detected = data.hands_detected || false;
-                const status = document.getElementById('detectionStatus');
-                status.textContent = detected ? 'Hand(s) Detected' : 'No Hands';
-                status.style.color = detected ? '#64ffda' : '#ff5252';
+                
+                // Hide pose details, show hand details
+                poseDetails.style.display = 'none';
+                handDetails.style.display = detected ? 'block' : 'none';
+                
+                if (detected) {
+                    status.textContent = '✓ Hand(s) Detected';
+                    status.style.color = '#64ffda';
+                    
+                    // Update hand details
+                    const handData = data.hand_data || {};
+                    const numHands = handData.num_hands || 1;
+                    document.getElementById('handCount').textContent = numHands;
+                    
+                    // Determine hand type
+                    let handType = '-';
+                    if (handData.hand_0_type) {
+                        if (numHands === 1) {
+                            handType = handData.hand_0_type;
+                        } else {
+                            const hand1 = handData.hand_0_type || '';
+                            const hand2 = handData.hand_1_type || '';
+                            handType = `${hand1}${hand2 ? ' + ' + hand2 : ''}`;
+                        }
+                    }
+                    document.getElementById('handType').textContent = handType;
+                    
+                    // Display gesture
+                    const gesture = data.gesture || 'Unknown';
+                    document.getElementById('gesture').textContent = gesture;
+                    
+                    // Landmark count
+                    const landmarkCount = numHands * 21;
+                    document.getElementById('handLandmarkCount').textContent = `${landmarkCount} (${numHands} × 21)`;
+                } else {
+                    status.textContent = '✗ No Hands Detected';
+                    status.style.color = '#ff5252';
+                }
             }
+        }
+        
+        function estimateBodyPosition(poseData) {
+            // Estimate body position using multiple heuristics
+            try {
+                if (!poseData || Object.keys(poseData).length === 0) {
+                    return 'Detected';
+                }
+                
+                // Extract key landmarks (normalized 0-1 coordinates)
+                const leftShoulder = { y: poseData.LEFT_SHOULDER_y };
+                const rightShoulder = { y: poseData.RIGHT_SHOULDER_y };
+                const leftHip = { y: poseData.LEFT_HIP_y };
+                const rightHip = { y: poseData.RIGHT_HIP_y };
+                const leftKnee = { y: poseData.LEFT_KNEE_y };
+                const rightKnee = { y: poseData.RIGHT_KNEE_y };
+                const leftAnkle = { y: poseData.LEFT_ANKLE_y };
+                const rightAnkle = { y: poseData.RIGHT_ANKLE_y };
+                const nose = { y: poseData.NOSE_y };
+                
+                // Check if we have required landmarks
+                if (leftShoulder.y === undefined || leftHip.y === undefined) {
+                    return 'Detected';
+                }
+                
+                // Calculate average shoulder and hip positions
+                const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+                const avgHipY = (leftHip.y + rightHip.y) / 2;
+                const avgKneeY = (leftKnee.y + rightKnee.y) / 2;
+                const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
+                
+                // Method 1: Shoulder-to-hip vertical distance
+                const shoulderHipDiff = Math.abs(avgHipY - avgShoulderY);
+                
+                // Method 2: Hip-to-knee distance (if person is sitting, knees are closer to hips)
+                const hipKneeDiff = Math.abs(avgKneeY - avgHipY);
+                
+                // Method 3: Knee-to-ankle distance
+                const kneeAnkleDiff = Math.abs(avgAnkleY - avgKneeY);
+                
+                // Method 4: Full body extent (shoulder to ankle)
+                const fullBodyExtent = Math.abs(avgAnkleY - avgShoulderY);
+                
+                // Debug logging (comment out in production)
+                console.log('Body Analysis:', {
+                    shoulderHipDiff: shoulderHipDiff.toFixed(3),
+                    hipKneeDiff: hipKneeDiff.toFixed(3),
+                    kneeAnkleDiff: kneeAnkleDiff.toFixed(3),
+                    fullBodyExtent: fullBodyExtent.toFixed(3)
+                });
+                
+                // Determine posture
+                // Sitting: compressed upper-lower body, knees close to hips
+                if (hipKneeDiff < 0.12 && shoulderHipDiff < 0.25) {
+                    return 'Sitting';
+                }
+                
+                // Crouching: very compressed full body
+                if (fullBodyExtent < 0.35 && hipKneeDiff < 0.15) {
+                    return 'Crouching';
+                }
+                
+                // Lying down: very small shoulder-hip difference, body horizontal
+                if (shoulderHipDiff < 0.1 && fullBodyExtent < 0.4) {
+                    return 'Lying Down';
+                }
+                
+                // Standing: good separation between body parts
+                if (shoulderHipDiff > 0.15 && hipKneeDiff > 0.12 && fullBodyExtent > 0.45) {
+                    return 'Standing';
+                }
+                
+                // Leaning: moderate separation
+                if (shoulderHipDiff > 0.12 && shoulderHipDiff < 0.2) {
+                    return 'Leaning';
+                }
+                
+                // Default: just detected
+                return 'Standing';
+                
+            } catch (e) {
+                console.error('Error estimating body position:', e);
+                return 'Detected';
+            }
+        }
+        
+        function estimateVisibility(poseData) {
+            // Estimate average visibility from pose data
+            try {
+                if (!poseData || Object.keys(poseData).length === 0) {
+                    return 'Unknown';
+                }
+                
+                let visibilitySum = 0;
+                let count = 0;
+                
+                // Count visibility scores for key body parts
+                for (const key in poseData) {
+                    if (key.endsWith('_visibility')) {
+                        const value = poseData[key];
+                        if (value !== undefined && value !== null) {
+                            visibilitySum += value;
+                            count++;
+                        }
+                    }
+                }
+                
+                if (count > 0) {
+                    const avgVisibility = visibilitySum / count;
+                    
+                    console.log('Visibility Analysis:', {
+                        avgVisibility: avgVisibility.toFixed(3),
+                        landmarksChecked: count
+                    });
+                    
+                    if (avgVisibility > 0.85) return 'Excellent (>85%)';
+                    if (avgVisibility > 0.70) return 'Good (>70%)';
+                    if (avgVisibility > 0.50) return 'Fair (>50%)';
+                    if (avgVisibility > 0.30) return 'Poor (>30%)';
+                    return 'Very Poor (<30%)';
+                }
+            } catch (e) {
+                console.error('Error estimating visibility:', e);
+            }
+            return 'Unknown';
         }
 
         async function downloadCSV() {

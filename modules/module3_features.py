@@ -1,382 +1,503 @@
 """
-Module 3: Gradients, LoG, Edge/Corner Detection, Segmentation
+Module 3: Comprehensive Feature Detection
+Gradient, LoG, Edges (NMS + Hysteresis), Corners (Harris), Boundary Detection, ArUco Segmentation
 Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
 """
 
 import cv2
 import numpy as np
-from scipy import ndimage
+import math
 
 class GradientComputation:
-    """Compute image gradients and related features"""
+    """Compute gradient magnitude and angle"""
     
-    @staticmethod
-    def compute_gradients(image):
-        """
-        Compute gradient magnitude and angle
-        
-        Returns:
-            (magnitude, angle, grad_x, grad_y)
-        """
-        # Convert to grayscale
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
-        
-        # Compute gradients using Sobel
-        grad_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        
-        # Compute magnitude and angle
-        magnitude = np.sqrt(grad_x**2 + grad_y**2)
-        angle = np.arctan2(grad_y, grad_x) * 180 / np.pi
-        
-        # Normalize magnitude for visualization
-        magnitude_vis = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        
-        # Normalize angle to 0-255
-        angle_vis = ((angle + 180) / 360 * 255).astype(np.uint8)
-        
-        return magnitude_vis, angle_vis, grad_x, grad_y
+    def __init__(self):
+        self.sobel_ksize = 3
     
-    @staticmethod
-    def compute_log(image, sigma=2.0):
+    def compute_gradient_magnitude(self, image):
         """
-        Compute Laplacian of Gaussian
-        
-        Args:
-            image: Input image
-            sigma: Standard deviation for Gaussian
-        
-        Returns:
-            LoG filtered image
+        Compute gradient magnitude using Sobel operator
+        Returns: 8-bit magnitude image
         """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
-        # Apply Gaussian blur first
-        blurred = cv2.GaussianBlur(gray, (0, 0), sigma)
+        # Gaussian blur for noise reduction
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0.8)
         
-        # Apply Laplacian
-        log = cv2.Laplacian(blurred, cv2.CV_64F)
+        # Sobel gradients
+        dx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=self.sobel_ksize)
+        dy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=self.sobel_ksize)
         
-        # Normalize for visualization
-        log_vis = cv2.normalize(np.abs(log), None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        # Magnitude
+        magnitude = cv2.magnitude(dx, dy)
         
-        return log_vis, log
+        # Normalize to 0-255
+        mag_normalized = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+        mag_8u = mag_normalized.astype(np.uint8)
+        
+        # Optional: enhance visibility
+        kernel = np.ones((3, 3), np.uint8)
+        mag_8u = cv2.dilate(mag_8u, kernel)
+        
+        # Convert to RGB for display
+        result = cv2.cvtColor(mag_8u, cv2.COLOR_GRAY2BGR)
+        
+        return result
+    
+    def compute_gradient_angle(self, image):
+        """
+        Compute gradient angle visualized in HSV color space
+        Returns: RGB image with angle as hue, magnitude as value
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        
+        # Gaussian blur
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0.8)
+        
+        # Sobel gradients
+        dx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=self.sobel_ksize)
+        dy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=self.sobel_ksize)
+        
+        # Magnitude and angle
+        magnitude, angle = cv2.cartToPolar(dx, dy, angleInDegrees=True)
+        
+        # Normalize magnitude
+        mag_normalized = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+        mag_8u = mag_normalized.astype(np.uint8)
+        
+        # Create mask for significant edges
+        _, mask = cv2.threshold(mag_8u, 20, 255, cv2.THRESH_BINARY)
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.dilate(mask, kernel)
+        
+        # Convert angle to hue (0-179 for OpenCV)
+        hue = (angle * 0.5).astype(np.uint8)
+        hue = np.clip(hue, 0, 179)
+        
+        # Create HSV image
+        saturation = np.full_like(hue, 255)
+        value = cv2.bitwise_and(mag_8u, mask)
+        
+        hsv = cv2.merge([hue, saturation, value])
+        
+        # Convert to RGB
+        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        
+        return rgb
+
+
+class LaplacianOfGaussian:
+    """Laplacian of Gaussian (LoG) edge detection"""
+    
+    def __init__(self, gauss_ksize=5, gauss_sigma=1.0, laplace_ksize=3):
+        self.gauss_ksize = gauss_ksize
+        self.gauss_sigma = gauss_sigma
+        self.laplace_ksize = laplace_ksize
+    
+    def detect(self, image):
+        """
+        Apply LoG: Gaussian blur + Laplacian
+        Returns: Edge image
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        
+        # Gaussian blur
+        blurred = cv2.GaussianBlur(gray, (self.gauss_ksize, self.gauss_ksize), 
+                                   self.gauss_sigma, self.gauss_sigma)
+        
+        # Laplacian
+        laplacian = cv2.Laplacian(blurred, cv2.CV_32F, ksize=self.laplace_ksize)
+        
+        # Convert to absolute values and scale
+        log_abs = cv2.convertScaleAbs(laplacian)
+        
+        # Enhance visibility
+        kernel = np.ones((3, 3), np.uint8)
+        log_abs = cv2.dilate(log_abs, kernel)
+        
+        # Equalize for better visualization
+        log_abs = cv2.equalizeHist(log_abs)
+        
+        # Convert to RGB
+        result = cv2.cvtColor(log_abs, cv2.COLOR_GRAY2BGR)
+        
+        return result
 
 
 class EdgeDetection:
-    """Manual edge detection algorithms"""
+    """Custom edge detection with NMS and hysteresis"""
     
-    @staticmethod
-    def simple_edge_detection(image, threshold_low=50, threshold_high=150):
+    def __init__(self, sigma=1.0, low_threshold=15, high_threshold=40):
+        self.sigma = sigma
+        self.low_threshold = low_threshold
+        self.high_threshold = high_threshold
+    
+    def detect(self, image):
         """
-        Simple edge detection using gradient magnitude
+        Edge detection: Sobel + NMS + Hysteresis
+        Returns: (edge_image, edge_count)
         """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
-        # Compute gradients
-        grad_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        # Gaussian blur
+        ksize = int(2 * round(2 * self.sigma) + 1)
+        blurred = cv2.GaussianBlur(gray, (ksize, ksize), self.sigma)
         
-        # Apply hysteresis thresholding
-        edges = np.zeros_like(gray)
-        edges[magnitude > threshold_high] = 255
+        # Sobel gradients
+        dx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3)
+        dy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
         
-        # Add weak edges connected to strong edges
-        weak_edges = (magnitude > threshold_low) & (magnitude <= threshold_high)
-        strong_edges = (magnitude > threshold_high)
+        # Magnitude and angle
+        magnitude = cv2.magnitude(dx, dy)
+        angle = cv2.phase(dx, dy, angleInDegrees=True)
         
-        # Simple dilation to connect edges
+        # Non-maximum suppression
+        nms = self._non_maximum_suppression(magnitude, angle)
+        
+        # Normalize
+        nms_normalized = cv2.normalize(nms, None, 0, 255, cv2.NORM_MINMAX)
+        nms_8u = nms_normalized.astype(np.uint8)
+        
+        # Hysteresis thresholding
+        edges = self._hysteresis_threshold(nms_8u, self.low_threshold, self.high_threshold)
+        
+        # Thicken edges for visibility
         kernel = np.ones((3, 3), np.uint8)
-        strong_dilated = cv2.dilate(strong_edges.astype(np.uint8), kernel, iterations=1)
+        edges = cv2.dilate(edges, kernel)
         
-        edges[weak_edges & (strong_dilated > 0)] = 255
+        # Count edge pixels
+        edge_count = cv2.countNonZero(edges)
         
-        return edges
-    
-    @staticmethod
-    def canny_edge_detection(image, threshold1=50, threshold2=150):
-        """Canny edge detection"""
+        # Create overlay on original image
         if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            result = image.copy()
         else:
-            gray = image.copy()
+            result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
         
-        edges = cv2.Canny(gray, threshold1, threshold2)
-        return edges
+        # Create red overlay for edges
+        red_mask = np.zeros_like(result)
+        red_mask[:,:,2] = edges  # Red channel (BGR format)
+        result = cv2.addWeighted(result, 0.7, red_mask, 0.8, 0)
+        
+        return result, edge_count
+    
+    def _non_maximum_suppression(self, magnitude, angle):
+        """Apply non-maximum suppression"""
+        rows, cols = magnitude.shape
+        nms = np.zeros_like(magnitude)
+        
+        # Normalize angle to 0-180
+        angle = angle % 180
+        
+        for y in range(1, rows - 1):
+            for x in range(1, cols - 1):
+                a = angle[y, x]
+                m = magnitude[y, x]
+                
+                # Determine neighbors based on gradient direction
+                if (0 <= a < 22.5) or (157.5 <= a <= 180):
+                    # Horizontal
+                    n1 = magnitude[y, x-1]
+                    n2 = magnitude[y, x+1]
+                elif 22.5 <= a < 67.5:
+                    # Diagonal /
+                    n1 = magnitude[y-1, x+1]
+                    n2 = magnitude[y+1, x-1]
+                elif 67.5 <= a < 112.5:
+                    # Vertical
+                    n1 = magnitude[y-1, x]
+                    n2 = magnitude[y+1, x]
+                else:  # 112.5 <= a < 157.5
+                    # Diagonal \
+                    n1 = magnitude[y-1, x-1]
+                    n2 = magnitude[y+1, x+1]
+                
+                # Keep only local maxima
+                if m >= n1 and m >= n2:
+                    nms[y, x] = m
+        
+        return nms
+    
+    def _hysteresis_threshold(self, nms, low, high):
+        """
+        Apply hysteresis thresholding using morphological propagation
+        More efficient than iterative pixel-by-pixel checking
+        """
+        # Create strong and weak edge maps
+        strong = np.zeros_like(nms, dtype=np.uint8)
+        weak = np.zeros_like(nms, dtype=np.uint8)
+        
+        strong[nms >= high] = 255
+        weak[nms >= low] = 255
+        
+        # Remove strong from weak to get only weak edges
+        weak_only = cv2.subtract(weak, strong)
+        
+        # Propagate strong edges into connected weak edges
+        connected = strong.copy()
+        kernel = np.ones((3, 3), np.uint8)
+        
+        # Iteratively dilate and connect weak edges (max 12 iterations)
+        for _ in range(12):
+            # Dilate connected edges
+            dilated = cv2.dilate(connected, kernel, iterations=1)
+            
+            # Find weak edges that touch dilated strong edges
+            add = cv2.bitwise_and(dilated, weak_only)
+            
+            # If no new edges added, we're done
+            if cv2.countNonZero(add) == 0:
+                break
+            
+            # Add these edges to connected
+            connected = cv2.bitwise_or(connected, add)
+            
+            # Remove them from weak_only
+            weak_only = cv2.subtract(weak_only, add)
+        
+        return connected
 
 
 class CornerDetection:
-    """Manual corner detection algorithms"""
+    """Harris corner detection"""
     
-    @staticmethod
-    def harris_corner_detection(image, block_size=2, ksize=3, k=0.04, threshold=0.01):
+    def __init__(self, k=0.04, threshold=70, window_size=5):
+        self.k = k
+        self.threshold = threshold
+        self.window_size = window_size
+    
+    def detect(self, image):
         """
         Harris corner detection
-        
-        Args:
-            image: Input image
-            block_size: Size of neighborhood
-            ksize: Aperture parameter for Sobel
-            k: Harris detector free parameter
-            threshold: Threshold for corner detection
-        
-        Returns:
-            Image with corners marked
+        Returns: (result_image, corner_count)
         """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
-        gray_float = np.float32(gray)
+        # Gaussian blur
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0.8)
         
-        # Detect corners
-        dst = cv2.cornerHarris(gray_float, block_size, ksize, k)
+        # Compute gradients
+        Ix = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3)
+        Iy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
         
-        # Dilate to mark corners
-        dst = cv2.dilate(dst, None)
+        # Products of derivatives
+        Ixx = Ix * Ix
+        Iyy = Iy * Iy
+        Ixy = Ix * Iy
         
-        # Create result image
-        result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR) if len(image.shape) == 2 else image.copy()
+        # Gaussian window
+        Sxx = cv2.GaussianBlur(Ixx, (self.window_size, self.window_size), 1.0)
+        Syy = cv2.GaussianBlur(Iyy, (self.window_size, self.window_size), 1.0)
+        Sxy = cv2.GaussianBlur(Ixy, (self.window_size, self.window_size), 1.0)
         
-        # Mark corners
-        result[dst > threshold * dst.max()] = [0, 0, 255]
+        # Harris response
+        det = Sxx * Syy - Sxy * Sxy
+        trace = Sxx + Syy
+        R = det - self.k * (trace ** 2)
         
-        # Get corner coordinates
-        corners = np.argwhere(dst > threshold * dst.max())
-        
-        return result, corners, dst
-    
-    @staticmethod
-    def shi_tomasi_corners(image, max_corners=100, quality=0.01, min_distance=10):
-        """
-        Shi-Tomasi corner detection (Good Features to Track)
-        """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
-        
-        # Detect corners
-        corners = cv2.goodFeaturesToTrack(gray, max_corners, quality, min_distance)
-        
-        # Create result image
-        result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR) if len(image.shape) == 2 else image.copy()
-        
-        if corners is not None:
-            corners = np.int0(corners)
-            for corner in corners:
-                x, y = corner.ravel()
-                cv2.circle(result, (x, y), 5, (0, 255, 0), -1)
-        
-        return result, corners
-
-
-class Segmentation:
-    """Classical segmentation methods"""
-    
-    @staticmethod
-    def threshold_segmentation(image, method='otsu'):
-        """
-        Threshold-based segmentation
-        
-        Args:
-            image: Input image
-            method: 'otsu', 'adaptive', or 'binary'
-        
-        Returns:
-            Segmented binary image
-        """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
-        
-        if method == 'otsu':
-            _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        elif method == 'adaptive':
-            binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                          cv2.THRESH_BINARY, 11, 2)
-        else:  # binary
-            _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-        
-        return binary
-    
-    @staticmethod
-    def watershed_segmentation(image):
-        """Watershed segmentation"""
-        if len(image.shape) == 2:
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-        
-        # Convert to grayscale
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Normalize
+        R_normalized = cv2.normalize(R, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_32F)
+        R_8u = R_normalized.astype(np.uint8)
         
         # Threshold
-        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        _, threshold_mask = cv2.threshold(R_8u, self.threshold, 255, cv2.THRESH_BINARY)
         
-        # Noise removal
-        kernel = np.ones((3, 3), np.uint8)
-        opening = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)
+        # Non-maximum suppression (local maxima)
+        dilated = cv2.dilate(R_8u, np.ones((3, 3), np.uint8))
+        local_max = (R_8u == dilated) & (threshold_mask == 255)
         
-        # Sure background
-        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+        # Find corner coordinates
+        corners = np.argwhere(local_max)
+        corner_count = len(corners)
         
-        # Sure foreground
-        dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
-        _, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
-        sure_fg = np.uint8(sure_fg)
+        # Create result with heatmap and corner markers
+        result = image.copy()
         
-        # Unknown region
-        unknown = cv2.subtract(sure_bg, sure_fg)
+        # Add heatmap overlay
+        heatmap = cv2.equalizeHist(R_8u)
+        heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        result = cv2.addWeighted(result, 0.6, heatmap_color, 0.4, 0)
         
-        # Marker labelling
-        _, markers = cv2.connectedComponents(sure_fg)
-        markers = markers + 1
-        markers[unknown == 255] = 0
+        # Draw corner points (green circles)
+        for corner in corners:
+            y, x = corner
+            cv2.circle(result, (x, y), 5, (0, 255, 0), 2, cv2.LINE_AA)
+            # Add small center dot for visibility
+            cv2.circle(result, (x, y), 2, (0, 255, 0), -1, cv2.LINE_AA)
         
-        # Apply watershed
-        markers = cv2.watershed(image, markers)
+        return result, corner_count
+
+
+class BoundaryDetection:
+    """Boundary detection using Canny + morphological operations + contours"""
+    
+    def __init__(self):
+        pass
+    
+    def detect(self, image):
+        """
+        Detect object boundaries using Canny + morphological operations + contour analysis
+        Returns: (result_image, contour_count)
+        """
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        h, w = gray.shape
+        img_area = h * w
+        
+        # Gaussian blur
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0.8)
+        
+        # Compute gradients for Otsu auto-threshold
+        dx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3)
+        dy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
+        mag = cv2.magnitude(dx, dy)
+        mag_8u = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        
+        # Auto-threshold using Otsu on gradient magnitude
+        otsu_val, _ = cv2.threshold(mag_8u, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        high_threshold = max(30, int(otsu_val))
+        low_threshold = max(5, int(0.5 * high_threshold))
+        
+        # Canny edge detection
+        edges = cv2.Canny(blurred, low_threshold, high_threshold, apertureSize=3, L2gradient=True)
+        
+        # Morphological closing to connect nearby edges
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+        
+        # Find contours
+        contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Filter contours by area (min 2% of image area)
+        min_area = 0.02 * img_area
+        significant_contours = []
+        
+        # Find best contour (largest area with preference for center)
+        cx0, cy0 = w / 2, h / 2
+        diag = np.hypot(w, h)
+        best_score = -1
+        best_contour = None
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < min_area:
+                continue
+            
+            # Compute centroid
+            M = cv2.moments(cnt)
+            if M['m00'] == 0:
+                continue
+            
+            cx = M['m10'] / M['m00']
+            cy = M['m01'] / M['m00']
+            
+            # Distance from image center (normalized)
+            dist = np.hypot(cx - cx0, cy - cy0) / diag
+            
+            # Score: larger area and closer to center is better
+            center_bonus = 1.2 if dist <= 0.4 else 1.0
+            score = area * center_bonus * (1.0 - 0.6 * dist)
+            
+            if score > best_score:
+                best_score = score
+                best_contour = cnt
+            
+            significant_contours.append(cnt)
         
         # Create result
         result = image.copy()
-        result[markers == -1] = [0, 0, 255]
         
-        return result, markers
+        if best_contour is not None:
+            # Approximate polygon for cleaner boundary
+            perimeter = cv2.arcLength(best_contour, True)
+            epsilon = max(0.5, 0.015 * perimeter)
+            approx = cv2.approxPolyDP(best_contour, epsilon, True)
+            
+            # Draw best contour with green semi-transparent fill
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillPoly(mask, [approx], 255)
+            
+            # Green overlay
+            overlay = result.copy()
+            overlay[mask == 255] = overlay[mask == 255] * 0.65 + np.array([0, 255, 0]) * 0.35
+            result = overlay.astype(np.uint8)
+            
+            # Draw boundary (thick green line)
+            cv2.polylines(result, [approx], True, (0, 255, 0), 3, cv2.LINE_AA)
+            
+            # Draw all other contours (thinner)
+            other_contours = [cnt for cnt in significant_contours if cnt is not best_contour]
+            cv2.drawContours(result, other_contours, -1, (0, 200, 200), 2, cv2.LINE_AA)
+            
+            # Draw centroid and bounding box for best contour
+            M = cv2.moments(best_contour)
+            if M['m00'] != 0:
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+                cv2.circle(result, (cx, cy), 6, (0, 0, 255), -1, cv2.LINE_AA)
+                cv2.circle(result, (cx, cy), 8, (0, 0, 255), 2, cv2.LINE_AA)
+            
+            x, y, w, h = cv2.boundingRect(best_contour)
+            cv2.rectangle(result, (x, y), (x+w, y+h), (255, 0, 0), 2, cv2.LINE_AA)
+        
+        return result, len(significant_contours)
+
+
+class ArucoSegmentation:
+    """ArUco marker-based object segmentation"""
     
-    @staticmethod
-    def aruco_based_segmentation(image, aruco_dict_type=cv2.aruco.DICT_4X4_50):
+    def __init__(self):
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+        self.aruco_params = cv2.aruco.DetectorParameters()
+        self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
+    
+    def segment(self, image):
         """
-        Segmentation using ArUco markers as boundary markers
-        
-        Detects ArUco markers and segments the region they enclose
+        Segment object using ArUco markers
+        Returns: (result_image, marker_count)
         """
-        # Get ArUco dictionary
-        aruco_dict = cv2.aruco.getPredefinedDictionary(aruco_dict_type)
-        aruco_params = cv2.aruco.DetectorParameters()
-        detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
         # Detect markers
-        corners, ids, rejected = detector.detectMarkers(image)
+        corners, ids, rejected = self.detector.detectMarkers(gray)
         
         result = image.copy()
-        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        marker_count = 0
         
-        if ids is not None and len(corners) > 0:
-            # Draw detected markers
-            cv2.aruco.drawDetectedMarkers(result, corners, ids)
+        if ids is not None and len(ids) > 0:
+            marker_count = len(ids)
             
-            # Get centers of markers
-            centers = []
+            # Draw detected markers with IDs
+            cv2.aruco.drawDetectedMarkers(result, corners, ids, borderColor=(0, 255, 0))
+            
+            # If multiple markers, create convex hull
+            if len(corners) >= 3:
+                all_corners = np.vstack([c.reshape(-1, 2) for c in corners])
+                hull = cv2.convexHull(all_corners.astype(np.float32))
+                hull_int = hull.astype(np.int32)
+                
+                # Draw segmentation boundary (thick green line)
+                cv2.polylines(result, [hull_int], True, (0, 255, 0), 4, cv2.LINE_AA)
+                
+                # Fill with semi-transparent overlay
+                overlay = result.copy()
+                cv2.fillPoly(overlay, [hull_int], (0, 255, 100))
+                result = cv2.addWeighted(result, 0.7, overlay, 0.3, 0)
+            
+            # Draw marker centers (blue dots)
             for corner in corners:
                 center = corner[0].mean(axis=0).astype(int)
-                centers.append(center)
-            
-            # If we have at least 3 markers, create a polygon
-            if len(centers) >= 3:
-                centers_array = np.array(centers, dtype=np.int32)
-                cv2.fillPoly(mask, [centers_array], 255)
-                
-                # Apply mask to image
-                segmented = cv2.bitwise_and(image, image, mask=mask)
-                
-                # Draw polygon
-                cv2.polylines(result, [centers_array], True, (0, 255, 0), 2)
-                
-                return result, segmented, mask, corners, ids
+                cv2.circle(result, tuple(center), 6, (255, 0, 0), -1, cv2.LINE_AA)
+                cv2.circle(result, tuple(center), 8, (255, 0, 0), 2, cv2.LINE_AA)
         
-        return result, image, mask, corners, ids
+        return result, marker_count
+
+
+# Legacy classes for backward compatibility
+class Segmentation:
+    """Simple segmentation using thresholding"""
     
-    @staticmethod
-    def contour_based_segmentation(image):
-        """
-        Extract exact object boundaries using contours
-        """
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
-        
-        # Apply threshold
+    def segment(self, image):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Find contours
-        contours, hierarchy = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Create result image
-        result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR) if len(image.shape) == 2 else image.copy()
-        
-        # Draw all contours
-        cv2.drawContours(result, contours, -1, (0, 255, 0), 2)
-        
-        # Find largest contour
-        if len(contours) > 0:
-            largest_contour = max(contours, key=cv2.contourArea)
-            
-            # Draw largest contour
-            cv2.drawContours(result, [largest_contour], -1, (0, 0, 255), 3)
-            
-            # Get bounding box
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            cv2.rectangle(result, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            
-            # Create mask
-            mask = np.zeros_like(gray)
-            cv2.drawContours(mask, [largest_contour], -1, 255, -1)
-            
-            return result, mask, largest_contour
-        
-        return result, np.zeros_like(gray), None
-
-
-def process_dataset_gradients(images, output_dir='outputs'):
-    """
-    Process a dataset of images to compute gradients and LoG
-    
-    Args:
-        images: List of images
-        output_dir: Directory to save outputs
-    
-    Returns:
-        List of processed results
-    """
-    import os
-    os.makedirs(output_dir, exist_ok=True)
-    
-    results = []
-    gradient_comp = GradientComputation()
-    
-    for i, image in enumerate(images):
-        # Compute gradients
-        mag, angle, grad_x, grad_y = gradient_comp.compute_gradients(image)
-        
-        # Compute LoG
-        log_vis, log_raw = gradient_comp.compute_log(image)
-        
-        # Save images
-        cv2.imwrite(f'{output_dir}/image_{i}_magnitude.png', mag)
-        cv2.imwrite(f'{output_dir}/image_{i}_angle.png', angle)
-        cv2.imwrite(f'{output_dir}/image_{i}_log.png', log_vis)
-        
-        results.append({
-            'index': i,
-            'magnitude': mag,
-            'angle': angle,
-            'log': log_vis,
-            'original': image
-        })
-    
-    return results
-
-
-
-
+        result = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+        return result

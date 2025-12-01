@@ -12,7 +12,8 @@ import os
 from datetime import datetime
 from modules.module1_dimension import DimensionEstimator
 from modules.module2_template import TemplateMatchingModule, FourierRestoration, TemplateMatchingWithBlur
-from modules.module3_features import GradientComputation, EdgeDetection, CornerDetection, Segmentation
+from modules.module3_features import (GradientComputation, EdgeDetection, CornerDetection, Segmentation,
+                                       LaplacianOfGaussian, BoundaryDetection, ArucoSegmentation)
 from modules.module4_sift_stitching import SIFTFromScratch, ImageStitching
 from modules.module5_tracking import MarkerBasedTracker, MarkerlessTracker, ColorBasedTracker
 from modules.module7_pose_hand import PoseEstimation, HandTracking, StereoCalibration
@@ -23,8 +24,11 @@ template_matcher = TemplateMatchingModule()
 fourier_restoration = FourierRestoration()
 template_blur = TemplateMatchingWithBlur()
 gradient_comp = GradientComputation()
-edge_detector = EdgeDetection()
-corner_detector = CornerDetection()
+log_detector = LaplacianOfGaussian()
+edge_detector_simple = EdgeDetection()
+corner_detector_harris = CornerDetection()
+boundary_detector = BoundaryDetection()
+aruco_segmentation = ArucoSegmentation()
 segmentation = Segmentation()
 image_stitcher = ImageStitching()
 pose_estimator = PoseEstimation()
@@ -196,123 +200,105 @@ def register_api_routes(app):
     
     # ==================== MODULE 3 APIs ====================
     
-    @app.route('/api/module3/gradients', methods=['POST'])
-    def api_module3_gradients():
-        """Compute gradients and LoG"""
+    @app.route('/api/module3/process', methods=['POST'])
+    def api_module3_process():
+        """Comprehensive feature detection processing"""
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Not authenticated'}), 401
         
         try:
             data = request.json
             image_data = data.get('image')
+            mode = data.get('mode', 'gradient_mag')
+            params = data.get('params', {})
+            
+            app.logger.info(f"Module 3 processing: mode={mode}, params={params}")
             
             image = decode_image(image_data)
+            if image is None:
+                return jsonify({'success': False, 'message': 'Failed to decode image'}), 400
             
-            # Compute gradients
-            magnitude, angle, _, _ = gradient_comp.compute_gradients(image)
+            app.logger.info(f"Image decoded: shape={image.shape}, dtype={image.dtype}")
             
-            # Compute LoG
-            log_vis, _ = gradient_comp.compute_log(image)
+            result_image = None
+            count = None
+            message = "Processing complete"
+            
+            # Process based on mode
+            if mode == 'gradient_mag':
+                app.logger.info("Computing gradient magnitude...")
+                result_image = gradient_comp.compute_gradient_magnitude(image)
+                message = "Gradient magnitude computed"
+                
+            elif mode == 'gradient_angle':
+                app.logger.info("Computing gradient angle...")
+                result_image = gradient_comp.compute_gradient_angle(image)
+                message = "Gradient angle visualized in HSV"
+                
+            elif mode == 'log':
+                app.logger.info("Applying Laplacian of Gaussian...")
+                sigma = params.get('sigma', 1.0)
+                log_detector.gauss_sigma = sigma
+                result_image = log_detector.detect(image)
+                message = "Laplacian of Gaussian applied"
+                
+            elif mode == 'edges':
+                app.logger.info(f"Detecting edges with params: {params}")
+                sigma = params.get('sigma', 1.0)
+                low = params.get('low_threshold', 15)
+                high = params.get('high_threshold', 40)
+                edge_det = EdgeDetection(sigma=sigma, low_threshold=low, high_threshold=high)
+                result_image, count = edge_det.detect(image)
+                message = f"Edge detection complete ({count} edge pixels)"
+                app.logger.info(f"Edges detected: {count} pixels")
+                
+            elif mode == 'corners':
+                app.logger.info(f"Detecting corners with params: {params}")
+                k = params.get('k', 0.04)
+                threshold = params.get('threshold', 70)
+                window_size = params.get('window_size', 5)
+                corner_det = CornerDetection(k=k, threshold=threshold, window_size=window_size)
+                result_image, count = corner_det.detect(image)
+                message = f"Harris corner detection ({count} corners found)"
+                app.logger.info(f"Corners detected: {count}")
+                
+            elif mode == 'boundary':
+                app.logger.info("Detecting boundaries...")
+                result_image, count = boundary_detector.detect(image)
+                message = f"Boundary detection complete ({count} objects found)"
+                app.logger.info(f"Boundaries detected: {count} objects")
+                
+            elif mode == 'aruco':
+                app.logger.info("Detecting ArUco markers...")
+                result_image, count = aruco_segmentation.segment(image)
+                if count > 0:
+                    message = f"ArUco segmentation ({count} markers detected)"
+                else:
+                    message = "No ArUco markers detected - Print markers from https://chev.me/arucogen/"
+                app.logger.info(f"ArUco markers detected: {count}")
+            
+            else:
+                return jsonify({'success': False, 'message': 'Invalid mode'}), 400
+            
+            if result_image is None:
+                return jsonify({'success': False, 'message': 'Processing returned no result'}), 500
+            
+            app.logger.info(f"Result image: shape={result_image.shape}, dtype={result_image.dtype}")
+            
+            encoded = encode_image(result_image, quality=90)
             
             return jsonify({
                 'success': True,
-                'magnitude': encode_image(magnitude),
-                'angle': encode_image(cv2.applyColorMap(angle, cv2.COLORMAP_HSV)),
-                'log': encode_image(log_vis)
+                'result_image': encoded,
+                'count': count,
+                'message': message
             })
+            
         except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-    
-    @app.route('/api/module3/edges', methods=['POST'])
-    def api_module3_edges():
-        """Edge detection"""
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
-        
-        try:
-            data = request.json
-            image_data = data.get('image')
-            
-            image = decode_image(image_data)
-            
-            # Simple edge detection
-            simple_edges = edge_detector.simple_edge_detection(image)
-            
-            # Canny edge detection
-            canny_edges = edge_detector.canny_edge_detection(image)
-            
-            return jsonify({
-                'success': True,
-                'simple_edges': encode_image(simple_edges),
-                'canny_edges': encode_image(canny_edges)
-            })
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-    
-    @app.route('/api/module3/corners', methods=['POST'])
-    def api_module3_corners():
-        """Corner detection"""
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
-        
-        try:
-            data = request.json
-            image_data = data.get('image')
-            
-            image = decode_image(image_data)
-            
-            # Harris corners
-            harris_result, corners, _ = corner_detector.harris_corner_detection(image)
-            
-            # Shi-Tomasi corners
-            shi_tomasi_result, _ = corner_detector.shi_tomasi_corners(image)
-            
-            return jsonify({
-                'success': True,
-                'harris_corners': encode_image(harris_result),
-                'shi_tomasi_corners': encode_image(shi_tomasi_result),
-                'num_corners': len(corners)
-            })
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-    
-    @app.route('/api/module3/segment', methods=['POST'])
-    def api_module3_segment():
-        """Segmentation"""
-        if 'user_id' not in session:
-            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
-        
-        try:
-            data = request.json
-            image_data = data.get('image')
-            method = data.get('method', 'otsu')
-            
-            image = decode_image(image_data)
-            
-            if method in ['otsu', 'adaptive', 'binary']:
-                result = segmentation.threshold_segmentation(image, method)
-                return jsonify({
-                    'success': True,
-                    'segmented': encode_image(result)
-                })
-            elif method == 'contour':
-                result, mask, contour = segmentation.contour_based_segmentation(image)
-                return jsonify({
-                    'success': True,
-                    'segmented': encode_image(result),
-                    'mask': encode_image(mask)
-                })
-            elif method == 'aruco':
-                result, segmented, mask, corners, ids = segmentation.aruco_based_segmentation(image)
-                return jsonify({
-                    'success': True,
-                    'result': encode_image(result),
-                    'segmented': encode_image(segmented),
-                    'mask': encode_image(mask),
-                    'markers_found': ids is not None and len(ids) > 0
-                })
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
+            import traceback
+            error_details = traceback.format_exc()
+            app.logger.error(f"Module 3 processing error: {str(e)}\n{error_details}")
+            return jsonify({'success': False, 'message': f"Processing error: {str(e)}"}), 500
     
     # ==================== MODULE 4 APIs ====================
     
@@ -495,11 +481,18 @@ def register_api_routes(app):
             
             annotated, landmarks, pose_data = pose_estimator.process_frame(image)
             
+            # Add summary statistics
+            summary = {
+                'landmark_count': 33 if landmarks else 0,
+                'detected': landmarks is not None
+            }
+            
             return jsonify({
                 'success': True,
                 'image': encode_image(annotated, quality=80),
                 'pose_detected': landmarks is not None,
-                'pose_data': pose_data
+                'pose_data': pose_data,
+                'summary': summary
             })
         except Exception as e:
             print(f"Pose error: {str(e)}")
@@ -524,15 +517,25 @@ def register_api_routes(app):
             
             # Detect gestures
             gesture = None
+            num_hands = 0
             if landmarks and len(landmarks) > 0:
                 gesture = hand_tracker.detect_gestures(landmarks[0])
+                num_hands = len(landmarks)
+            
+            # Add summary statistics
+            summary = {
+                'num_hands': num_hands,
+                'landmark_count': num_hands * 21,
+                'detected': landmarks is not None and len(landmarks) > 0
+            }
             
             return jsonify({
                 'success': True,
                 'image': encode_image(annotated, quality=80),
-                'hands_detected': landmarks is not None,
+                'hands_detected': landmarks is not None and len(landmarks) > 0,
                 'hand_data': hand_data,
-                'gesture': gesture
+                'gesture': gesture,
+                'summary': summary
             })
         except Exception as e:
             print(f"Hand tracking error: {str(e)}")

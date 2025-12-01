@@ -32,10 +32,13 @@ A production-ready web-based computer vision platform featuring real-time tracki
    - Non-maximum suppression (NMS)
    - Progress tracking
 
-3. **Module 3: SIFT Feature Detection**
-   - Scale-Invariant Feature Transform
-   - Custom SIFT implementation
-   - Feature visualization
+3. **Module 3: Feature Detection & Analysis**
+   - Gradient computation (magnitude & angle visualization)
+   - Laplacian of Gaussian (LoG) edge detection
+   - Custom edge detection with NMS & hysteresis thresholding
+   - Harris corner detection with heatmap visualization
+   - Boundary detection with intelligent object scoring
+   - ArUco marker-based segmentation
 
 4. **Module 4: Image Stitching**
    - Panorama creation from multiple images
@@ -43,16 +46,20 @@ A production-ready web-based computer vision platform featuring real-time tracki
    - Homography estimation with RANSAC
    - Weighted blending
 
-5. **Module 5: Object Tracking**
-   - Real-time video object tracking
-   - Multiple tracking algorithms
-   - Performance optimization
+5. **Module 5-6: Object Tracking**
+   - Client-side tracking using OpenCV.js
+   - Marker-based tracking (ArUco, QR codes)
+   - Marker-less tracking (template matching, optical flow)
+   - SAM2 segmentation integration with NPZ file support
+   - Real-time FPS and object count display
 
-6. **Module 7: Pose & Hand Detection**
-   - MediaPipe integration
-   - Real-time pose estimation
-   - Hand landmark detection
-   - Stereo camera calibration
+6. **Module 7: Pose & Hand Tracking**
+   - Mediapipe integration for real-time tracking
+   - Full body pose estimation with 33 landmarks
+   - Body position detection (Standing, Sitting, Crouching, Lying Down, Leaning)
+   - Hand tracking with gesture recognition (Left/Right hand detection)
+   - Visibility quality metrics and landmark counts
+   - CSV data export for pose and hand coordinates
 
 ---
 
