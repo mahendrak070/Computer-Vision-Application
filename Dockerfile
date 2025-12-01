@@ -27,8 +27,9 @@ RUN mkdir -p database uploads face_encodings logs
 
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_ENV=production
+ENV PORT=8080
 
 EXPOSE $PORT
 
-CMD gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 app:app
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --timeout 120 app:app"]
 
