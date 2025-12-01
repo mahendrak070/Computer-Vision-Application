@@ -5,7 +5,7 @@ builder = "DOCKERFILE"
 NIXPACKS_APT_PKGS = "libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1"
 
 [deploy]
-startCommand = "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 app:app"
+startCommand = "bash start.sh"
 healthcheckPath = "/"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

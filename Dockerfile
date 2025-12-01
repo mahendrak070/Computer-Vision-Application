@@ -23,13 +23,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-RUN mkdir -p database uploads face_encodings logs
+RUN mkdir -p database uploads face_encodings logs && \
+    chmod +x start.sh
 
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_ENV=production
 ENV PORT=8080
 
-EXPOSE $PORT
+EXPOSE 8080
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --timeout 120 app:app"]
+CMD ["./start.sh"]
 
