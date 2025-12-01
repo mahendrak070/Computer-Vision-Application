@@ -1,147 +1,278 @@
-# Computer Vision Project Website
+# Computer Vision Web Application
+
+**Live Demo:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
 
 **Authors:** Mahendra Krishna Koneru and Sai Leenath Jampala
 
-A comprehensive web-based computer vision platform with face authentication, real-time tracking, image processing, and advanced CV algorithms.
+A production-ready web-based computer vision platform featuring real-time tracking, image processing, SIFT stitching, dimension estimation, and advanced CV algorithms.
 
 ---
 
-## Quick Start
+## 🚀 Quick Access
 
-### Installation
+**Live Application:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
 
-1. **Navigate to project:**
+**Developer Login:** [https://web-production-217c2.up.railway.app/dev-login](https://web-production-217c2.up.railway.app/dev-login)
+
+---
+
+## ✨ Features
+
+### Computer Vision Modules
+
+1. **Module 1: Dimension Estimation**
+   - Real-world dimension measurement using perspective projection
+   - Camera calibration integration (MTX & DIST)
+   - Multi-point selection (up to 4 points)
+   - Default: 5 inches known distance, 5238px focal length
+
+2. **Module 2: Template Matching & Fourier Restoration**
+   - Real-time template matching with bounding boxes
+   - Gaussian blur and FFT-based restoration
+   - Non-maximum suppression (NMS)
+   - Progress tracking
+
+3. **Module 3: SIFT Feature Detection**
+   - Scale-Invariant Feature Transform
+   - Custom SIFT implementation
+   - Feature visualization
+
+4. **Module 4: Image Stitching**
+   - Panorama creation from multiple images
+   - FLANN-based feature matching
+   - Homography estimation with RANSAC
+   - Weighted blending
+
+5. **Module 5: Object Tracking**
+   - Real-time video object tracking
+   - Multiple tracking algorithms
+   - Performance optimization
+
+6. **Module 7: Pose & Hand Detection**
+   - MediaPipe integration
+   - Real-time pose estimation
+   - Hand landmark detection
+   - Stereo camera calibration
+
+---
+
+## 🌐 Deployment
+
+**Platform:** Railway  
+**URL:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)  
+**Status:** ✅ Live & Production Ready
+
+### Auto-Deployment
+
+Every push to `main` branch automatically deploys to Railway:
+
 ```bash
-cd "/Users/mahi/Desktop/Computer Vision/WEB"
+git add .
+git commit -m "Your changes"
+git push origin main
 ```
 
-2. **Run startup script:**
-```bash
-# macOS/Linux
-./start.sh
+Railway will rebuild and deploy in ~3-5 minutes.
 
-# Windows
-start.bat
+---
+
+## 💻 Local Development
+
+### Prerequisites
+
+- Python 3.12
+- Git
+
+### Setup
+
+1. **Clone repository:**
+```bash
+git clone https://github.com/mahendrak070/Computer-Vision-Application.git
+cd Computer-Vision-Application
 ```
 
-3. **Access application:**
+2. **Create virtual environment:**
+```bash
+python3.12 -m venv venv
+source venv/bin/activate  # macOS/Linux
+# or
+venv\Scripts\activate  # Windows
+```
+
+3. **Install dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+4. **Run application:**
+```bash
+python app.py
+```
+
+5. **Access locally:**
 ```
 http://localhost:5001
 ```
 
 ---
 
-## Features
+## 🔐 Authentication
 
-- **Face Authentication** - Secure face-based login and registration
-- **Module 1** - Real-world dimension estimation
-- **Module 2** - Template matching & Fourier restoration
-- **Module 3** - Feature detection & segmentation
-- **Module 4** - Image stitching & SIFT
-- **Module 5-6** - Real-time object tracking
-- **Module 7** - Pose estimation & hand tracking
+**Production (Railway):** Face authentication is disabled to prevent build complications.
 
----
+**Access Methods:**
 
-## Usage
+1. **Developer Login** (Recommended)
+   - URL: [https://web-production-217c2.up.railway.app/dev-login](https://web-production-217c2.up.railway.app/dev-login)
+   - One-click access to all modules
+   - No registration required
 
-### First Time Setup
-
-1. **Register:** http://localhost:5001/register
-   - Enter username and email
-   - Capture your face
-   - Click Register
-
-2. **Login:** http://localhost:5001/login
-   - Click "Authenticate with Face"
-   - Auto-capture and login
-
-3. **Quick Access:** http://localhost:5001/dev-login
-   - Bypass authentication for testing
-
-### Access Modules
-
-**Dashboard:** http://localhost:5001/dashboard
-
-All 7 modules accessible from dashboard with intuitive interfaces.
+2. **Face Authentication** (Local Only)
+   - Works on local development server
+   - Requires `dlib` and `face-recognition` libraries
+   - Install locally: `pip install face-recognition dlib`
 
 ---
 
-## Troubleshooting
+## 📁 Project Structure
 
-**Port already in use:**
+```
+Computer-Vision-Application/
+├── app.py                  # Flask application entry point
+├── api_routes.py           # API endpoints for all modules
+├── config.py               # Configuration management
+├── error_handlers.py       # Error handling
+├── validators.py           # Input validation
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Docker container configuration
+├── Procfile                # Process file for deployment
+├── railway.toml            # Railway configuration
+├── runtime.txt             # Python version specification
+├── start.sh                # Startup script
+├── modules/                # Computer Vision modules
+│   ├── module1_dimension.py
+│   ├── module2_template.py
+│   ├── module3_features.py
+│   ├── module4_sift_stitching.py
+│   ├── module5_tracking.py
+│   └── module7_pose_hand.py
+├── templates/              # HTML templates
+│   ├── index.html
+│   ├── login.html
+│   ├── register.html
+│   ├── dashboard.html
+│   ├── module1.html
+│   ├── module2.html
+│   ├── module3.html
+│   ├── module4.html
+│   ├── module5.html
+│   └── module7.html
+└── static/                 # CSS and assets
+    └── css/
+        └── module.css
+```
+
+---
+
+## 🛠️ Technical Stack
+
+**Backend:**
+- Flask 3.0.3
+- OpenCV 4.9 (headless)
+- NumPy 1.26.4
+- SciPy 1.12.0
+- Scikit-image 0.23.2
+- MediaPipe 0.10.21
+- Gunicorn 21.2.0
+
+**Frontend:**
+- HTML5, CSS3, JavaScript
+- Canvas API for image processing
+- WebRTC for camera access
+
+**Database:**
+- SQLite3
+
+**Deployment:**
+- Docker
+- Railway (auto-deployment)
+
+---
+
+## 📊 API Endpoints
+
+### Module 1: Dimension Estimation
+```
+POST /api/module1/undistort
+POST /api/module1/estimate
+```
+
+### Module 2: Template Matching
+```
+POST /api/module2/match
+POST /api/module2/restore
+```
+
+### Module 3: Feature Detection
+```
+POST /api/module3/detect
+POST /api/module3/segment
+```
+
+### Module 4: Image Stitching
+```
+POST /api/module4/stitch
+```
+
+### Module 5: Object Tracking
+```
+POST /api/module5/init
+POST /api/module5/track
+```
+
+### Module 7: Pose & Hand Tracking
+```
+POST /api/module7/pose
+POST /api/module7/hand
+POST /api/module7/calibrate
+```
+
+---
+
+## 🎯 Performance
+
+- Real-time processing at 30+ FPS
+- Optimized FLANN-based feature matching
+- Efficient image stitching with RANSAC
+- Low-latency API responses
+- Progress tracking for long operations
+
+---
+
+## 🔧 Configuration
+
+Environment variables (set in Railway):
+
 ```bash
-lsof -i:5001
-kill -9 <PID>
-```
-
-**Camera not working:**
-- Allow browser camera permissions
-- Close other apps using camera
-
-**Face authentication fails:**
-- Ensure good lighting
-- Position face clearly
-- Use dev-login for testing
-
----
-
-## Technical Stack
-
-- **Backend:** Flask, OpenCV, Mediapipe, face_recognition
-- **Frontend:** HTML5, CSS3, JavaScript
-- **Database:** SQLite
-- **Server:** Flask (port 5001)
-
----
-
-## Project Structure
-
-```
-WEB/
-├── app.py              # Main Flask app
-├── api_routes.py       # API endpoints
-├── config.py           # Configuration
-├── error_handlers.py   # Error handling
-├── validators.py       # Input validation
-├── modules/            # CV algorithms
-├── templates/          # HTML templates
-├── static/            # CSS/JS files
-├── database/          # SQLite DB
-└── face_encodings/    # Face data
+FLASK_ENV=production
+PORT=8080
+SECRET_KEY=your-secret-key
 ```
 
 ---
 
-## Server Commands
+## 📝 License
 
-```bash
-# Start server
-./start.sh
-
-# Stop server
-pkill -9 -f "python app.py"
-
-# Check status
-lsof -i:5001
-
-# View logs
-tail -f server.log
-```
+Educational project by Mahendra Krishna Koneru and Sai Leenath Jampala (2025)
 
 ---
 
-## Health Check
+## 🌐 Links
 
-```bash
-curl http://localhost:5001/health
-curl http://localhost:5001/api/status
-```
+- **Live App:** [https://web-production-217c2.up.railway.app/](https://web-production-217c2.up.railway.app/)
+- **GitHub:** [https://github.com/mahendrak070/Computer-Vision-Application](https://github.com/mahendrak070/Computer-Vision-Application)
+- **Railway Dashboard:** [https://railway.app](https://railway.app)
 
 ---
 
-## Contact
-
-**Authors:** Mahendra Krishna Koneru and Sai Leenath Jampala  
-**Version:** 1.0  
-**Year:** 2025
+**Deployed on Railway** | **Powered by Flask & OpenCV** | **© 2025**
