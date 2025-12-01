@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Computer Vision Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #ffffff;
+        }
+
+        .header {
+            background: rgba(26, 26, 46, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 247, 255, 0.2);
+            padding: 24px 48px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00f7ff 0%, #0084ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logout-btn {
+            padding: 10px 24px;
+            background: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
+            border: 1px solid #ff5252;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 82, 82, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 48px 24px;
+        }
+
+        .welcome {
+            margin-bottom: 48px;
+            text-align: center;
+        }
+
+        .welcome h2 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .welcome p {
+            font-size: 18px;
+            color: #8892b0;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .module-card {
+            background: rgba(26, 26, 46, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 247, 255, 0.2);
+            border-radius: 20px;
+            padding: 32px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .module-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(0, 247, 255, 0.5);
+            box-shadow: 0 12px 40px rgba(0, 247, 255, 0.2);
+        }
+
+        .module-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .module-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #00f7ff;
+        }
+
+        .module-desc {
+            font-size: 14px;
+            color: #8892b0;
+            line-height: 1.6;
+        }
+
+        .dev-login {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 24px;
+            background: rgba(100, 255, 218, 0.1);
+            color: #64ffda;
+            border: 1px solid #64ffda;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .dev-login:hover {
+            background: rgba(100, 255, 218, 0.2);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Computer Vision Dashboard</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="container">
+        <div class="welcome">
+            <h2>Select a Module</h2>
+            <p>Choose from 7 advanced computer vision modules</p>
+        </div>
+
+        <div class="modules-grid">
+            <a href="/module1" class="module-card">
+                <div class="module-icon">📏</div>
+                <div class="module-title">Module 1</div>
+                <div class="module-desc">Real-World Dimension Estimation using perspective projection and camera calibration</div>
+            </a>
+
+            <a href="/module2" class="module-card">
+                <div class="module-icon">🔍</div>
+                <div class="module-title">Module 2</div>
+                <div class="module-desc">Template Matching & Fourier Restoration with multiple object detection</div>
+            </a>
+
+            <a href="/module3" class="module-card">
+                <div class="module-icon">🎯</div>
+                <div class="module-title">Module 3</div>
+                <div class="module-desc">Feature Detection with gradients, edges, corners, and segmentation</div>
+            </a>
+
+            <a href="/module4" class="module-card">
+                <div class="module-icon">🖼️</div>
+                <div class="module-title">Module 4</div>
+                <div class="module-desc">Image Stitching with custom SIFT implementation and panorama generation</div>
+            </a>
+
+            <a href="/module5" class="module-card">
+                <div class="module-icon">📹</div>
+                <div class="module-title">Module 5</div>
+                <div class="module-desc">Real-Time Object Tracking with marker-based and marker-less methods</div>
+            </a>
+
+            <a href="/module7" class="module-card">
+                <div class="module-icon">🤚</div>
+                <div class="module-title">Module 7</div>
+                <div class="module-desc">Pose Estimation & Hand Tracking with real-time skeleton and landmark detection</div>
+            </a>
+        </div>
+    </div>
+
+    <button class="dev-login" onclick="location.href='/dev-login'">Dev Login</button>
+
+    <script>
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (err) {
+                console.error('Logout error:', err);
+                window.location.href = '/';
+            }
+        }
+    </script>
+</body>
+</html>

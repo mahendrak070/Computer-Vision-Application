@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 4 - Image Stitching</title>
+    <link rel="stylesheet" href="/static/css/module.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Module 4: Image Stitching & SIFT</h1>
+        <a href="/dashboard" class="back-btn">Back to Dashboard</a>
+    </div>
+
+    <div class="container">
+        <div class="section">
+            <h2>Image Stitching</h2>
+            <div class="info-box">
+                <strong>How it works:</strong> Upload 2+ images (left to right order) for panorama generation using SIFT feature matching and RANSAC homography estimation.
+            </div>
+
+            <input type="file" id="stitchInput" accept="image/*" multiple onchange="loadStitchImages(event)">
+            <div class="controls">
+                <button class="btn-primary" onclick="document.getElementById('stitchInput').click()">Upload Images</button>
+                <button class="btn-danger" onclick="clearStitchImages()">Clear</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">Images Loaded:</span>
+                    <span class="stat-value" id="imageCount">0</span>
+                </div>
+            </div>
+
+            <div id="stitchPreview" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 16px 0;"></div>
+
+            <button id="stitchBtn" class="btn-primary" onclick="stitchImages()" disabled style="width: 100%;">Stitch Panorama</button>
+
+            <div class="progress-container" id="stitchProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="stitchProgressFill">0%</div>
+                </div>
+                <div class="progress-text" id="stitchProgressText">Processing...</div>
+            </div>
+
+            <div class="loading-spinner" id="stitchSpinner"></div>
+
+            <div id="panoramaResult" style="margin-top: 24px; display:none;">
+                <div class="result-card">
+                    <h4>Stitched Panorama</h4>
+                    <img id="panorama" style="width: 100%;" alt="Panorama">
+                    <button class="btn-secondary" onclick="downloadImage(document.getElementById('panorama').src, 'panorama.jpg')">Download</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>SIFT Feature Detection</h2>
+            <div class="info-box">
+                <strong>Compare:</strong> OpenCV SIFT vs Custom implementation for feature detection.
+            </div>
+
+            <input type="file" id="siftInput" accept="image/*" onchange="loadSiftImage(event)">
+            <div class="controls">
+                <button class="btn-primary" onclick="document.getElementById('siftInput').click()">Upload Image</button>
+                <button id="opencvBtn" class="btn-secondary" onclick="detectSift(false)" disabled>OpenCV SIFT</button>
+                <button id="customBtn" class="btn-secondary" onclick="detectSift(true)" disabled>Custom SIFT</button>
+            </div>
+
+            <div class="progress-container" id="siftProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="siftProgressFill">0%</div>
+                </div>
+                <div class="progress-text" id="siftProgressText">Processing...</div>
+            </div>
+
+            <div class="loading-spinner" id="siftSpinner"></div>
+            <div id="siftResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let stitchImages_data = [];
+        let siftImage = null;
+
+        function loadStitchImages(event) {
+            const files = Array.from(event.target.files);
+            stitchImages_data = [];
+            const preview = document.getElementById('stitchPreview');
+            preview.innerHTML = '';
+
+            files.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    stitchImages_data.push(e.target.result);
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <div style="position: relative;">
+                            <div style="position: absolute; top: 8px; left: 8px; background: rgba(0, 247, 255, 0.9); color: #0a0a1a; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">${index + 1}</div>
+                            <img src="${e.target.result}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid rgba(0, 247, 255, 0.3);">
+                        </div>
+                    `;
+                    preview.appendChild(div);
+
+                    document.getElementById('imageCount').textContent = stitchImages_data.length;
+                    document.getElementById('stitchBtn').disabled = stitchImages_data.length < 2;
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function clearStitchImages() {
+            stitchImages_data = [];
+            document.getElementById('stitchPreview').innerHTML = '';
+            document.getElementById('panoramaResult').style.display = 'none';
+            document.getElementById('stitchBtn').disabled = true;
+            document.getElementById('imageCount').textContent = '0';
+            document.getElementById('stitchInput').value = '';
+        }
+
+        async function stitchImages() {
+            if (stitchImages_data.length < 2) {
+                alert('Please upload at least 2 images');
+                return;
+            }
+
+            const progressContainer = document.getElementById('stitchProgress');
+            const progressFill = document.getElementById('stitchProgressFill');
+            const progressText = document.getElementById('stitchProgressText');
+            const spinner = document.getElementById('stitchSpinner');
+            
+            progressContainer.classList.add('active');
+            spinner.classList.add('active');
+            
+            progressFill.style.width = '20%';
+            progressFill.textContent = '20%';
+            progressText.textContent = 'Uploading images...';
+
+            try {
+                console.log(`[Module 4] Stitching ${stitchImages_data.length} images`);
+                
+                progressFill.style.width = '30%';
+                progressFill.textContent = '30%';
+                progressText.textContent = 'Detecting features...';
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+                const response = await fetch('/api/module4/stitch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        images: stitchImages_data,
+                        use_custom_sift: false
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                progressFill.style.width = '70%';
+                progressFill.textContent = '70%';
+                progressText.textContent = 'Stitching panorama...';
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('[Module 4] Response:', data);
+
+                if (data.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    progressText.textContent = 'Complete!';
+                    
+                    document.getElementById('panorama').src = data.stitched;
+                    document.getElementById('panoramaResult').style.display = 'block';
+                    
+                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                } else {
+                    throw new Error(data.message || 'Stitching failed');
+                }
+            } catch (err) {
+                console.error('[Module 4] Error:', err);
+                
+                if (err.name === 'AbortError') {
+                    alert('Stitching timeout (2min). Try using smaller images or fewer images.');
+                } else if (err.message.includes('Not authenticated')) {
+                    alert('Session expired. Please log in again.');
+                    setTimeout(() => window.location.href = '/login', 1000);
+                } else {
+                    alert('Stitching Error: ' + err.message);
+                }
+                
+                progressContainer.classList.remove('active');
+            } finally {
+                spinner.classList.remove('active');
+            }
+        }
+
+        function loadSiftImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                siftImage = e.target.result;
+                document.getElementById('opencvBtn').disabled = false;
+                document.getElementById('customBtn').disabled = false;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        async function detectSift(useCustom) {
+            if (!siftImage) return;
+
+            const progressContainer = document.getElementById('siftProgress');
+            const progressFill = document.getElementById('siftProgressFill');
+            const progressText = document.getElementById('siftProgressText');
+            const spinner = document.getElementById('siftSpinner');
+            
+            progressContainer.classList.add('active');
+            spinner.classList.add('active');
+            
+            progressFill.style.width = '40%';
+            progressFill.textContent = '40%';
+            progressText.textContent = 'Detecting keypoints...';
+
+            try {
+                const response = await fetch('/api/module4/sift_detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: siftImage,
+                        use_custom: useCustom
+                    })
+                });
+                
+                progressFill.style.width = '80%';
+                progressFill.textContent = '80%';
+                progressText.textContent = 'Computing descriptors...';
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    progressText.textContent = 'Complete!';
+                    
+                    document.getElementById('siftResults').innerHTML = `
+                        <div class="result-card" style="margin-top: 24px;">
+                            <h4>${data.method === 'opencv' ? 'OpenCV' : 'Custom'} SIFT Results</h4>
+                            <div class="stat-item">
+                                <span class="stat-label">Keypoints Detected:</span>
+                                <span class="stat-value">${data.num_keypoints}</span>
+                            </div>
+                            <img src="${data.image}" style="width: 100%;">
+                            <button class="btn-secondary" onclick="downloadImage('${data.image}', 'sift_features.jpg')">Download</button>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+                progressContainer.classList.remove('active');
+            } finally {
+                spinner.classList.remove('active');
+            }
+        }
+
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            link.click();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            stitchImages_data = [];
+            siftImage = null;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 2 - Template Matching</title>
+    <link rel="stylesheet" href="/static/css/module.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Module 2: Template Matching & Fourier Restoration</h1>
+        <a href="/dashboard" class="back-btn">Back to Dashboard</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('template')">Template Matching</button>
+            <button class="tab" onclick="showTab('fourier')">Fourier Restoration</button>
+        </div>
+
+        <div id="templateTab" class="tab-content active">
+            <div class="section">
+                <h2>Template Matching</h2>
+                <div class="info-box">
+                    <strong>How it works:</strong> Upload templates and a scene image. The system detects all instances using correlation-based matching with bounding boxes.
+                </div>
+
+                <div class="grid">
+                    <div>
+                        <h3>Upload Templates</h3>
+                        <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)">
+                        <div class="controls">
+                            <button class="btn-primary" onclick="document.getElementById('templateInput').click()">Upload Templates</button>
+                            <button class="btn-danger" onclick="clearTemplates()">Clear All</button>
+                        </div>
+                        <div class="stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Templates Loaded:</span>
+                                <span class="stat-value" id="templateCount">0</span>
+                            </div>
+                        </div>
+                        <div id="templateList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-top: 16px;"></div>
+                    </div>
+
+                    <div>
+                        <h3>Upload Scene Image</h3>
+                        <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)">
+                        <div class="controls">
+                            <button class="btn-primary" onclick="document.getElementById('sceneInput').click()">Upload Scene</button>
+                        </div>
+                        <canvas id="sceneCanvas" style="width: 100%; max-width: 500px; margin-top: 16px;"></canvas>
+                    </div>
+                </div>
+
+                <button id="matchBtn" class="btn-primary" onclick="matchTemplates()" disabled style="width: 100%; margin-top: 24px;">Match All Templates</button>
+
+                <div class="progress-container" id="matchProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="matchProgressFill">0%</div>
+                    </div>
+                    <div class="progress-text" id="matchProgressText">Processing...</div>
+                </div>
+
+                <div class="loading-spinner" id="matchSpinner"></div>
+                <div id="matchResults"></div>
+            </div>
+        </div>
+
+        <div id="fourierTab" class="tab-content" style="display:none;">
+            <div class="section">
+                <h2>Fourier Restoration</h2>
+                <div class="info-box">
+                    <strong>Process:</strong> Apply Gaussian blur to an image and restore it using frequency domain filtering.
+                </div>
+
+                <input type="file" id="fourierInput" accept="image/*" onchange="loadFourierImage(event)">
+                <div class="controls">
+                    <button class="btn-primary" onclick="document.getElementById('fourierInput').click()">Upload Image</button>
+                    <button class="btn-danger" onclick="clearFourier()">Clear</button>
+                </div>
+
+                <div class="stats" style="margin: 24px 0;">
+                    <h3>Parameters</h3>
+                    <div style="margin-bottom: 16px;">
+                        <label>Kernel Size: <span id="kernelLabel">15</span></label>
+                        <input type="range" id="kernelSize" min="5" max="31" step="2" value="15" oninput="updateLabels()">
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <label>Sigma: <span id="sigmaLabel">3.0</span></label>
+                        <input type="range" id="sigma" min="1" max="10" step="0.5" value="3" oninput="updateLabels()">
+                    </div>
+                    <div>
+                        <label>Method:</label>
+                        <select id="method">
+                            <option value="wiener">Wiener Filter</option>
+                            <option value="richardson_lucy">Richardson-Lucy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="fourierBtn" class="btn-primary" onclick="processBlurRestore()" disabled style="width: 100%;">Blur & Restore</button>
+
+                <div class="progress-container" id="fourierProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="fourierProgressFill">0%</div>
+                    </div>
+                    <div class="progress-text" id="fourierProgressText">Processing...</div>
+                </div>
+
+                <div class="loading-spinner" id="fourierSpinner"></div>
+                <div class="results-grid" id="fourierResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let templates = [];
+        let sceneImage = null;
+        let fourierImage = null;
+
+        function showTab(tab) {
+            document.getElementById('templateTab').style.display = tab === 'template' ? 'block' : 'none';
+            document.getElementById('fourierTab').style.display = tab === 'fourier' ? 'block' : 'none';
+            
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        async function loadTemplates(event) {
+            const files = Array.from(event.target.files);
+            if (!files || files.length === 0) return;
+
+            for (let file of files) {
+                const reader = new FileReader();
+                await new Promise((resolve) => {
+                    reader.onload = async function(e) {
+                        try {
+                            const response = await fetch('/api/module2/add_template', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    image: e.target.result,
+                                    name: file.name
+                                })
+                            });
+                            const data = await response.json();
+                            if (data.success) {
+                                templates.push({ name: file.name, data: e.target.result });
+                            }
+                        } catch (err) {
+                            console.error('Error loading template:', err);
+                        }
+                        resolve();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            updateTemplatesList();
+            updateMatchButton();
+        }
+
+        function updateTemplatesList() {
+            const listDiv = document.getElementById('templateList');
+            const countSpan = document.getElementById('templateCount');
+            
+            countSpan.textContent = templates.length;
+            listDiv.innerHTML = templates.map((t, i) => `
+                <div style="text-align: center;">
+                    <img src="${t.data}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid rgba(0, 247, 255, 0.3);">
+                    <div style="font-size: 11px; color: #8892b0; margin-top: 4px;">${i + 1}. ${t.name}</div>
+                </div>
+            `).join('');
+        }
+
+        function clearTemplates() {
+            templates = [];
+            updateTemplatesList();
+            updateMatchButton();
+            document.getElementById('templateInput').value = '';
+        }
+
+        function loadScene(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('sceneCanvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    sceneImage = e.target.result;
+                    updateMatchButton();
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function updateMatchButton() {
+            document.getElementById('matchBtn').disabled = !(templates.length > 0 && sceneImage);
+        }
+
+        async function matchTemplates() {
+            if (!sceneImage || templates.length === 0) return;
+
+            const progressContainer = document.getElementById('matchProgress');
+            const progressFill = document.getElementById('matchProgressFill');
+            const progressText = document.getElementById('matchProgressText');
+            const spinner = document.getElementById('matchSpinner');
+            
+            progressContainer.classList.add('active');
+            spinner.classList.add('active');
+            
+            progressFill.style.width = '20%';
+            progressFill.textContent = '20%';
+            progressText.textContent = 'Matching templates...';
+
+            try {
+                const response = await fetch('/api/module2/match_templates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: sceneImage })
+                });
+                
+                progressFill.style.width = '80%';
+                progressFill.textContent = '80%';
+                progressText.textContent = 'Drawing bounding boxes...';
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    progressText.textContent = 'Complete!';
+                    
+                    displayMatchResults(data.matches);
+                    
+                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                } else {
+                    alert('Matching failed: ' + (data.message || 'Unknown error'));
+                    progressContainer.classList.remove('active');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+                progressContainer.classList.remove('active');
+            } finally {
+                spinner.classList.remove('active');
+            }
+        }
+
+        function displayMatchResults(matches) {
+            const resultsDiv = document.getElementById('matchResults');
+            
+            if (!matches || matches.length === 0) {
+                resultsDiv.innerHTML = '<div class="info-box">No matches found.</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = `
+                <div class="stats" style="margin-top: 24px;">
+                    <h3>Detection Results</h3>
+                    <div class="stat-item">
+                        <span class="stat-label">Templates Matched:</span>
+                        <span class="stat-value">${matches.length}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Detections:</span>
+                        <span class="stat-value">${matches.reduce((sum, m) => sum + m.num_detections, 0)}</span>
+                    </div>
+                </div>
+                <div class="results-grid" style="margin-top: 24px;">
+                    ${matches.map(m => `
+                        <div class="result-card">
+                            <h4>${m.name}</h4>
+                            <div class="stat-item">
+                                <span class="stat-label">Detections:</span>
+                                <span class="stat-value">${m.num_detections}</span>
+                            </div>
+                            <img src="${m.result_image}" alt="${m.name}">
+                            <button class="btn-secondary" onclick="downloadImage('${m.result_image}', '${m.name}_detected.jpg')">Download</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function loadFourierImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fourierImage = e.target.result;
+                document.getElementById('fourierBtn').disabled = false;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function clearFourier() {
+            fourierImage = null;
+            document.getElementById('fourierResults').innerHTML = '';
+            document.getElementById('fourierBtn').disabled = true;
+            document.getElementById('fourierInput').value = '';
+        }
+
+        function updateLabels() {
+            document.getElementById('kernelLabel').textContent = document.getElementById('kernelSize').value;
+            document.getElementById('sigmaLabel').textContent = document.getElementById('sigma').value;
+        }
+
+        async function processBlurRestore() {
+            if (!fourierImage) return;
+
+            const kernelSize = parseInt(document.getElementById('kernelSize').value);
+            const sigma = parseFloat(document.getElementById('sigma').value);
+            const method = document.getElementById('method').value;
+            
+            const progressContainer = document.getElementById('fourierProgress');
+            const progressFill = document.getElementById('fourierProgressFill');
+            const progressText = document.getElementById('fourierProgressText');
+            const spinner = document.getElementById('fourierSpinner');
+            
+            progressContainer.classList.add('active');
+            spinner.classList.add('active');
+            
+            progressFill.style.width = '30%';
+            progressFill.textContent = '30%';
+            progressText.textContent = 'Applying blur...';
+
+            try {
+                const response = await fetch('/api/module2/blur_restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: fourierImage,
+                        kernel_size: kernelSize,
+                        sigma: sigma,
+                        method: method
+                    })
+                });
+                
+                progressFill.style.width = '70%';
+                progressFill.textContent = '70%';
+                progressText.textContent = 'Restoring...';
+                
+                const data = await response.json();
+
+                if (data.success) {
+                    progressFill.style.width = '100%';
+                    progressFill.textContent = '100%';
+                    progressText.textContent = 'Complete!';
+                    
+                    displayFourierResults(data);
+                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                } else {
+                    alert('Processing failed: ' + (data.message || 'Unknown error'));
+                    progressContainer.classList.remove('active');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+                progressContainer.classList.remove('active');
+            } finally {
+                spinner.classList.remove('active');
+            }
+        }
+
+        function displayFourierResults(data) {
+            const resultsDiv = document.getElementById('fourierResults');
+            const kernelSize = data.kernel_size || 15;
+            const sigma = data.sigma || 3.0;
+            
+            resultsDiv.innerHTML = `
+                <div class="result-card">
+                    <h4>Original Image</h4>
+                    <img src="${data.original}" alt="Original">
+                    <button class="btn-secondary" onclick="downloadImage('${data.original}', 'original.jpg')">Download</button>
+                </div>
+                <div class="result-card">
+                    <h4>Blurred Image</h4>
+                    <p style="color: #8892b0; font-size: 13px;">Kernel: ${kernelSize}px, Sigma: ${sigma}</p>
+                    <img src="${data.blurred}" alt="Blurred">
+                    <button class="btn-secondary" onclick="downloadImage('${data.blurred}', 'blurred.jpg')">Download</button>
+                </div>
+                <div class="result-card">
+                    <h4>Restored Image</h4>
+                    <p style="color: #8892b0; font-size: 13px;">Method: ${data.method === 'wiener' ? 'Wiener Filter' : 'Richardson-Lucy'}</p>
+                    <img src="${data.restored}" alt="Restored">
+                    <button class="btn-secondary" onclick="downloadImage('${data.restored}', 'restored.jpg')">Download</button>
+                </div>
+            `;
+        }
+
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            link.click();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            templates = [];
+            sceneImage = null;
+            fourierImage = null;
+        });
+    </script>
+</body>
+</html>
