@@ -260,33 +260,66 @@
                 const response = await fetch(endpoint, { method: 'POST' });
                 
                 if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = mode === 'pose' ? 'pose_data.csv' : 'hand_data.csv';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    alert('CSV downloaded successfully!');
+                    const contentType = response.headers.get('content-type');
+                    
+                    // Check if response is CSV
+                    if (contentType && contentType.includes('text/csv')) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        
+                        // Get filename from response header or use default
+                        const disposition = response.headers.get('content-disposition');
+                        let filename = mode === 'pose' ? 'pose_data.csv' : 'hand_data.csv';
+                        if (disposition && disposition.includes('filename=')) {
+                            const matches = disposition.match(/filename="?(.+)"?/);
+                            if (matches && matches[1]) {
+                                filename = matches[1];
+                            }
+                        }
+                        
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        alert('✅ CSV downloaded successfully!\n\nFile: ' + filename);
+                    } else {
+                        // Response is JSON error
+                        const data = await response.json();
+                        alert('⚠️ ' + (data.message || 'No data to download. Start tracking first!'));
+                    }
                 } else {
-                    alert('No data to download. Start tracking first!');
+                    const data = await response.json();
+                    alert('⚠️ ' + (data.message || 'No data available. Start tracking first!'));
                 }
             } catch (err) {
-                alert('Download error: ' + err.message);
+                console.error('Download error:', err);
+                alert('❌ Download error: ' + err.message);
             }
         }
 
-        function resetData() {
-            if (confirm('Reset all statistics?')) {
-                frameCount = 0;
-                fps = 0;
-                document.getElementById('frameCount').textContent = '0';
-                document.getElementById('fpsDisplay').textContent = '0';
-                document.getElementById('detectionStatus').textContent = 'Waiting...';
-                document.getElementById('detectionStatus').style.color = '#00f7ff';
-                alert('Statistics reset!');
+        async function resetData() {
+            if (!confirm('Reset all statistics and clear CSV data?')) return;
+            
+            try {
+                const response = await fetch('/api/module7/reset_data', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    frameCount = 0;
+                    fps = 0;
+                    document.getElementById('frameCount').textContent = '0';
+                    document.getElementById('fpsDisplay').textContent = '0';
+                    document.getElementById('detectionStatus').textContent = 'Waiting...';
+                    document.getElementById('detectionStatus').style.color = '#00f7ff';
+                    alert('✅ Statistics and CSV data reset successfully!');
+                } else {
+                    alert('⚠️ Reset failed: ' + data.message);
+                }
+            } catch (err) {
+                alert('❌ Reset error: ' + err.message);
             }
         }
 

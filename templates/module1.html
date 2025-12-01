@@ -16,21 +16,16 @@
         <div class="section">
             <h2>Dimension Estimation</h2>
             <div class="info-box">
-                <strong>How it works:</strong> This module uses camera calibration data (MTX & DIST coefficients) to undistort images and calculate accurate real-world dimensions using perspective projection: <code>W_real = (W_pix × D) / f</code>
+                <strong>How it works:</strong> This module uses reference-based calibration to measure real-world dimensions. Lens distortion is automatically corrected using camera calibration data.
                 <br><br>
-                <strong>Camera Calibration:</strong>
-                <ul style="margin: 8px 0 0 20px; line-height: 1.6;">
-                    <li>Focal Length (fx): 5057.96 pixels (from calibration matrix)</li>
-                    <li>Lens distortion is automatically corrected</li>
-                    <li>Measurements are in inches (default distance: 5 inches)</li>
-                </ul>
-                <br>
                 <strong>Instructions:</strong>
                 <ol style="margin: 8px 0 0 20px; line-height: 1.8;">
                     <li>Upload an image - it will be automatically undistorted</li>
-                    <li>Click up to 4 points on the image to measure distances</li>
-                    <li>Distances are calculated between consecutive points (1→2, 2→3, 3→4)</li>
-                    <li>Adjust the "Known Distance" if your object is not at 5 inches</li>
+                    <li><strong>FIRST:</strong> Click 2 points on a reference object with KNOWN size (e.g., 4-inch square side)</li>
+                    <li>Enter the actual length of that reference in "Reference Length (inches)"</li>
+                    <li>Click <strong>"Set Reference"</strong> to calibrate</li>
+                    <li>Now click additional points to measure other distances (up to 4 points total)</li>
+                    <li>All measurements will be based on your reference calibration</li>
                     <li>Click Reset to start over</li>
                 </ol>
             </div>
@@ -51,15 +46,18 @@
                 </div>
                 <div>
                     <div class="stats">
-                        <h3>Parameters</h3>
+                        <h3>Calibration</h3>
                         <div>
-                            <label>Known Distance (inches):</label>
-                            <input type="number" id="knownDistance" value="5" min="0.1" step="0.1">
+                            <label>Reference Length (inches):</label>
+                            <input type="number" id="referenceLength" value="4" min="0.1" step="0.1">
                         </div>
                         <div style="margin-top: 12px;">
-                            <label>Focal Length (pixels):</label>
-                            <input type="number" id="focalLength" value="5058" min="1" step="0.01" readonly style="background: rgba(100, 255, 218, 0.05); cursor: not-allowed;">
-                            <small style="display: block; margin-top: 4px; font-size: 11px; color: #64ffda;">Calibrated camera value</small>
+                            <button class="btn-primary" onclick="setReference()" id="setRefBtn" disabled>Set Reference</button>
+                            <small style="display: block; margin-top: 8px; font-size: 11px; color: #64ffda;" id="calibStatus">Click 2 points first</small>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <label>Scale Factor (px/in):</label>
+                            <input type="text" id="scaleFactor" value="Not calibrated" readonly style="background: rgba(100, 255, 218, 0.05); cursor: not-allowed;">
                         </div>
                     </div>
                     <div class="stats" style="margin-top: 16px;">
@@ -87,6 +85,8 @@
         const ctx = canvas.getContext('2d');
         let points = [];
         let image = null;
+        let pixelsPerInch = null;
+        let isCalibrated = false;
 
         async function loadImage(event) {
             const file = event.target.files[0];
@@ -222,16 +222,53 @@
             document.getElementById('pointCount').textContent = `${points.length}/4`;
             drawImage();
             
+            if (points.length === 2 && !isCalibrated) {
+                document.getElementById('setRefBtn').disabled = false;
+                document.getElementById('calibStatus').textContent = 'Ready! Click "Set Reference"';
+                document.getElementById('calibStatus').style.color = '#00f7ff';
+            }
+            
             console.log(`Point ${points.length} added at (${x.toFixed(2)}, ${y.toFixed(2)})`);
         });
+        
+        function setReference() {
+            if (points.length < 2) {
+                alert('Please click 2 points first!');
+                return;
+            }
+            
+            const dx = points[1].x - points[0].x;
+            const dy = points[1].y - points[0].y;
+            const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            const refLength = parseFloat(document.getElementById('referenceLength').value);
+            pixelsPerInch = pixelDistance / refLength;
+            isCalibrated = true;
+            
+            document.getElementById('scaleFactor').value = pixelsPerInch.toFixed(2);
+            document.getElementById('calibStatus').textContent = '✓ Calibrated! Add more points to measure';
+            document.getElementById('calibStatus').style.color = '#64ffda';
+            document.getElementById('setRefBtn').disabled = true;
+            
+            calculateDistances();
+            
+            console.log(`✅ Calibrated: ${pixelsPerInch.toFixed(2)} px/inch`);
+        }
 
         function calculateDistances() {
-            const distance_inches = parseFloat(document.getElementById('knownDistance').value);
-            const focalLength = parseFloat(document.getElementById('focalLength').value);
-            const distance_mm = distance_inches * 25.4;
-            
             const container = document.getElementById('measurementsContainer');
             container.innerHTML = '';
+            
+            if (!isCalibrated) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'stat-item';
+                warningDiv.innerHTML = `
+                    <span class="stat-label" style="color: #ff6b6b;">⚠ Not calibrated</span>
+                    <span class="stat-value">Set reference first</span>
+                `;
+                container.appendChild(warningDiv);
+                return;
+            }
             
             let totalPixels = 0;
             let totalReal = 0;
@@ -241,8 +278,7 @@
                 const dy = points[i + 1].y - points[i].y;
                 const pixelDistance = Math.sqrt(dx * dx + dy * dy);
                 
-                const realDistance_mm = (pixelDistance * distance_mm) / focalLength;
-                const realDistance_in = realDistance_mm / 25.4;
+                const realDistance_in = pixelDistance / pixelsPerInch;
                 
                 totalPixels += pixelDistance;
                 totalReal += realDistance_in;
@@ -272,8 +308,14 @@
 
         function resetPoints() {
             points = [];
+            pixelsPerInch = null;
+            isCalibrated = false;
             document.getElementById('pointCount').textContent = '0/4';
             document.getElementById('measurementsContainer').innerHTML = '';
+            document.getElementById('scaleFactor').value = 'Not calibrated';
+            document.getElementById('calibStatus').textContent = 'Click 2 points first';
+            document.getElementById('calibStatus').style.color = '#64ffda';
+            document.getElementById('setRefBtn').disabled = true;
         }
 
         function resetCalculation() {

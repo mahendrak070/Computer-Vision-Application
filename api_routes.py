@@ -9,6 +9,7 @@ import numpy as np
 import base64
 import io
 import os
+from datetime import datetime
 from modules.module1_dimension import DimensionEstimator
 from modules.module2_template import TemplateMatchingModule, FourierRestoration, TemplateMatchingWithBlur
 from modules.module3_features import GradientComputation, EdgeDetection, CornerDetection, Segmentation
@@ -547,13 +548,22 @@ def register_api_routes(app):
             filename = f'pose_data_{session["user_id"]}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
             filepath = os.path.join('uploads', filename)
             
+            # Ensure uploads directory exists
+            os.makedirs('uploads', exist_ok=True)
+            
             success = pose_estimator.save_to_csv(filepath)
             
-            if success:
-                return send_file(filepath, as_attachment=True, download_name=filename)
+            if success and os.path.exists(filepath):
+                return send_file(
+                    filepath, 
+                    mimetype='text/csv',
+                    as_attachment=True, 
+                    download_name=filename
+                )
             else:
-                return jsonify({'success': False, 'message': 'No pose data to save'}), 400
+                return jsonify({'success': False, 'message': 'No pose data to save. Start tracking first!'}), 400
         except Exception as e:
+            app.logger.error(f"CSV save error: {str(e)}")
             return jsonify({'success': False, 'message': str(e)}), 500
     
     @app.route('/api/module7/save_hand_csv', methods=['POST'])
@@ -566,12 +576,35 @@ def register_api_routes(app):
             filename = f'hand_data_{session["user_id"]}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
             filepath = os.path.join('uploads', filename)
             
+            # Ensure uploads directory exists
+            os.makedirs('uploads', exist_ok=True)
+            
             success = hand_tracker.save_to_csv(filepath)
             
-            if success:
-                return send_file(filepath, as_attachment=True, download_name=filename)
+            if success and os.path.exists(filepath):
+                return send_file(
+                    filepath, 
+                    mimetype='text/csv',
+                    as_attachment=True, 
+                    download_name=filename
+                )
             else:
-                return jsonify({'success': False, 'message': 'No hand data to save'}), 400
+                return jsonify({'success': False, 'message': 'No hand data to save. Start tracking first!'}), 400
         except Exception as e:
+            app.logger.error(f"CSV save error: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)}), 500
+    
+    @app.route('/api/module7/reset_data', methods=['POST'])
+    def api_module7_reset_data():
+        """Reset pose and hand tracking data"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        
+        try:
+            pose_estimator.reset_data()
+            hand_tracker.reset_data()
+            return jsonify({'success': True, 'message': 'Data reset successfully'})
+        except Exception as e:
+            app.logger.error(f"Reset data error: {str(e)}")
             return jsonify({'success': False, 'message': str(e)}), 500
 
