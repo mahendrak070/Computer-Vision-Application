@@ -366,13 +366,26 @@ def register_api_routes(app):
             
             # Stitch images
             print(f"[Module 4] Starting stitching process...")
-            stitched = image_stitcher.stitch_images(images, use_custom_sift)
+            try:
+                stitched = image_stitcher.stitch_images(images, use_custom_sift)
+            except Exception as stitch_err:
+                print(f"[Module 4] Stitching exception: {str(stitch_err)}")
+                import traceback
+                traceback.print_exc()
+                del images
+                gc.collect()
+                return jsonify({'success': False, 'message': f'Stitching failed: {str(stitch_err)}'}), 500
             
             if stitched is None:
                 print(f"[Module 4] Stitching returned None")
+                del images
+                gc.collect()
                 return jsonify({'success': False, 'message': 'Stitching failed - insufficient feature matches'}), 400
             
             print(f"[Module 4] Stitching successful: {stitched.shape}")
+            
+            # Get shape before encoding
+            result_shape = stitched.shape[:2]
             
             # Encode result
             encoded = encode_image(stitched, quality=90)
@@ -385,7 +398,7 @@ def register_api_routes(app):
             return jsonify({
                 'success': True,
                 'stitched': encoded,
-                'shape': stitched.shape[:2]
+                'shape': result_shape
             })
         except Exception as e:
             print(f"[Module 4] Exception: {str(e)}")
