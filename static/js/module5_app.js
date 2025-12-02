@@ -362,3 +362,5 @@ function cleanupResources() {
 window.addEventListener('beforeunload', cleanupResources);
 window.addEventListener('pagehide', cleanupResources);
 
+
+

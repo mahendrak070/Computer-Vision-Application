@@ -31,3 +31,5 @@ def optimize_for_processing(image):
     optimized, _ = resize_if_large(image)
     return optimized
 
+
+

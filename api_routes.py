@@ -163,31 +163,60 @@ def register_api_routes(app):
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)}), 500
     
+    @app.route('/api/module2/clear_templates', methods=['POST'])
+    def api_module2_clear_templates():
+        """Clear all templates"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Not authenticated'}), 401
+        
+        try:
+            template_matcher.clear_templates()
+            return jsonify({
+                'success': True,
+                'message': 'All templates cleared'
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    
     @app.route('/api/module2/match_templates', methods=['POST'])
     def api_module2_match_templates():
-        """Match all templates in image - OPTIMIZED with bounding boxes"""
+        """
+        Template Matching using TM_CCOEFF_NORMED
+        
+        Based on OpenCV tutorial:
+        https://docs.opencv.org/4.x/d4/dc6/tutorial_py_template_matching.html
+        """
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Not authenticated'}), 401
         
         try:
             data = request.json
             image_data = data.get('image')
+            threshold = float(data.get('threshold', 0.8))
+            
+            print(f"[Module 2] Template matching: threshold={threshold}")
             
             image = decode_image(image_data)
-            results = template_matcher.match_all_templates(image)
+            if image is None:
+                return jsonify({'success': False, 'message': 'Failed to decode image'}), 400
+            
+            # Perform matching
+            results = template_matcher.match_all_templates(image, threshold=threshold)
             
             # Encode result images
             for result in results:
                 result['result_image'] = encode_image(result['result_image'], quality=90)
-                # Remove match_heatmap from response (too large)
-                if 'match_heatmap' in result:
-                    del result['match_heatmap']
+            
+            print(f"[Module 2] Matching complete: {len(results)} templates processed")
             
             return jsonify({
                 'success': True,
                 'matches': results
             })
         except Exception as e:
+            print(f"[Module 2] Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'success': False, 'message': str(e)}), 500
     
     @app.route('/api/module2/blur_restore', methods=['POST'])

@@ -5,10 +5,155 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Module 2 - Template Matching</title>
     <link rel="stylesheet" href="/static/css/module.css">
+    <style>
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .result-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 247, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .result-panel h4 {
+            margin: 0 0 12px 0;
+            color: #00f7ff;
+            font-size: 14px;
+        }
+        .result-panel img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 247, 255, 0.2);
+        }
+        .detection-badge {
+            display: inline-block;
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .param-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .param-row label {
+            min-width: 100px;
+            font-size: 13px;
+        }
+        .param-row input[type="range"] {
+            flex: 1;
+        }
+        .param-row .value {
+            min-width: 50px;
+            text-align: right;
+            color: #00f7ff;
+            font-weight: 600;
+        }
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 247, 255, 0.3);
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 3px;
+            background-color: #8892b0;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: rgba(0, 247, 255, 0.2);
+            border-color: #00f7ff;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: #00f7ff;
+        }
+        .template-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .template-preview img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 247, 255, 0.3);
+        }
+        .template-preview .info {
+            flex: 1;
+        }
+        .template-preview .name {
+            font-weight: 600;
+            color: #ccd6f6;
+            font-size: 13px;
+        }
+        .template-preview .size {
+            font-size: 11px;
+            color: #8892b0;
+        }
+        .template-preview .remove-btn {
+            background: rgba(255, 100, 100, 0.2);
+            border: 1px solid rgba(255, 100, 100, 0.5);
+            color: #ff6b6b;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .template-preview .remove-btn:hover {
+            background: rgba(255, 100, 100, 0.4);
+        }
+        @media (max-width: 768px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="header">
-        <h1>Module 2: Template Matching & Fourier Restoration</h1>
+        <h1>Module 2: Template Matching</h1>
         <a href="/dashboard" class="back-btn">Back to Dashboard</a>
     </div>
 
@@ -20,39 +165,62 @@
 
         <div id="templateTab" class="tab-content active">
             <div class="section">
-                <h2>Template Matching</h2>
+                <h2>🎯 Template Matching</h2>
                 <div class="info-box">
-                    <strong>How it works:</strong> Upload templates and a scene image. The system detects all instances using correlation-based matching with bounding boxes.
+                    <strong>How it works:</strong> Upload a template image and a scene image. 
+                    The system uses <code>cv.matchTemplate()</code> with <strong>TM_CCOEFF_NORMED</strong> 
+                    (normalized cross-correlation) to find the template in the scene.
+                    <br><br>
+                    <strong>Output:</strong> Clean white rectangle around detected object (like OpenCV tutorial).
                 </div>
 
                 <div class="grid">
+                    <!-- Left Column: Templates -->
                     <div>
-                        <h3>Upload Templates</h3>
-                        <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)">
+                        <h3>📋 Template Image</h3>
+                        <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)" style="display:none">
                         <div class="controls">
-                            <button class="btn-primary" onclick="document.getElementById('templateInput').click()">Upload Templates</button>
-                            <button class="btn-danger" onclick="clearTemplates()">Clear All</button>
+                            <button class="btn-primary" onclick="document.getElementById('templateInput').click()">+ Add Template</button>
+                            <button class="btn-danger" onclick="clearTemplates()">Clear</button>
                         </div>
                         <div class="stats">
                             <div class="stat-item">
-                                <span class="stat-label">Templates Loaded:</span>
+                                <span class="stat-label">Templates:</span>
                                 <span class="stat-value" id="templateCount">0</span>
                             </div>
                         </div>
-                        <div id="templateList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-top: 16px;"></div>
+                        <div id="templateList" style="margin-top: 16px; max-height: 300px; overflow-y: auto;"></div>
                     </div>
 
+                    <!-- Right Column: Scene -->
                     <div>
-                        <h3>Upload Scene Image</h3>
-                        <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)">
+                        <h3>🖼️ Scene Image</h3>
+                        <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)" style="display:none">
                         <div class="controls">
                             <button class="btn-primary" onclick="document.getElementById('sceneInput').click()">Upload Scene</button>
                         </div>
-                        <canvas id="sceneCanvas" style="width: 100%; max-width: 500px; margin-top: 16px;"></canvas>
+                        <canvas id="sceneCanvas" style="width: 100%; max-width: 500px; margin-top: 16px; border-radius: 8px; border: 1px solid rgba(0, 247, 255, 0.2);"></canvas>
                     </div>
                 </div>
 
-                <button id="matchBtn" class="btn-primary" onclick="matchTemplates()" disabled style="width: 100%; margin-top: 24px;">Match All Templates</button>
+                <!-- Configuration -->
+                <div class="stats" style="margin-top: 24px;">
+                    <h3>⚙️ Settings</h3>
+                    
+                    <div class="param-row">
+                        <label>Threshold:</label>
+                        <input type="range" id="threshold" min="0.5" max="0.99" step="0.01" value="0.8" oninput="updateThreshold()">
+                        <span class="value" id="thresholdValue">0.80</span>
+                    </div>
+                    <p style="font-size: 12px; color: #8892b0; margin-top: 4px;">
+                        Higher threshold = stricter matching. Lower it if no match is found.
+                    </p>
+                    
+                </div>
+
+                <button id="matchBtn" class="btn-primary" onclick="matchTemplates()" disabled style="width: 100%; margin-top: 24px; padding: 16px; font-size: 16px;">
+                    🔍 Find Template in Scene
+                </button>
 
                 <div class="progress-container" id="matchProgress">
                     <div class="progress-bar">
@@ -68,12 +236,12 @@
 
         <div id="fourierTab" class="tab-content" style="display:none;">
             <div class="section">
-                <h2>Fourier Restoration</h2>
+                <h2>🔬 Fourier Restoration</h2>
                 <div class="info-box">
                     <strong>Process:</strong> Apply Gaussian blur to an image and restore it using frequency domain filtering.
                 </div>
 
-                <input type="file" id="fourierInput" accept="image/*" onchange="loadFourierImage(event)">
+                <input type="file" id="fourierInput" accept="image/*" onchange="loadFourierImage(event)" style="display:none">
                 <div class="controls">
                     <button class="btn-primary" onclick="document.getElementById('fourierInput').click()">Upload Image</button>
                     <button class="btn-danger" onclick="clearFourier()">Clear</button>
@@ -81,24 +249,28 @@
 
                 <div class="stats" style="margin: 24px 0;">
                     <h3>Parameters</h3>
-                    <div style="margin-bottom: 16px;">
-                        <label>Kernel Size: <span id="kernelLabel">15</span></label>
+                    <div class="param-row">
+                        <label>Kernel Size:</label>
                         <input type="range" id="kernelSize" min="5" max="31" step="2" value="15" oninput="updateLabels()">
+                        <span class="value" id="kernelLabel">15</span>
                     </div>
-                    <div style="margin-bottom: 16px;">
-                        <label>Sigma: <span id="sigmaLabel">3.0</span></label>
+                    <div class="param-row">
+                        <label>Sigma:</label>
                         <input type="range" id="sigma" min="1" max="10" step="0.5" value="3" oninput="updateLabels()">
+                        <span class="value" id="sigmaLabel">3.0</span>
                     </div>
                     <div>
                         <label>Method:</label>
-                        <select id="method">
+                        <select id="method" style="width: 100%; padding: 10px; margin-top: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 247, 255, 0.3); color: #ccd6f6; border-radius: 8px;">
                             <option value="wiener">Wiener Filter</option>
                             <option value="richardson_lucy">Richardson-Lucy</option>
                         </select>
                     </div>
                 </div>
 
-                <button id="fourierBtn" class="btn-primary" onclick="processBlurRestore()" disabled style="width: 100%;">Blur & Restore</button>
+                <button id="fourierBtn" class="btn-primary" onclick="processBlurRestore()" disabled style="width: 100%;">
+                    ⚡ Blur & Restore
+                </button>
 
                 <div class="progress-container" id="fourierProgress">
                     <div class="progress-bar">
@@ -115,6 +287,7 @@
 
     <script>
         let templates = [];
+        let templateData = [];
         let sceneImage = null;
         let fourierImage = null;
 
@@ -126,6 +299,10 @@
             event.target.classList.add('active');
         }
 
+        function updateThreshold() {
+            document.getElementById('thresholdValue').textContent = parseFloat(document.getElementById('threshold').value).toFixed(2);
+        }
+
         async function loadTemplates(event) {
             const files = Array.from(event.target.files);
             if (!files || files.length === 0) return;
@@ -134,23 +311,33 @@
                 const reader = new FileReader();
                 await new Promise((resolve) => {
                     reader.onload = async function(e) {
-                        try {
-                            const response = await fetch('/api/module2/add_template', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    image: e.target.result,
-                                    name: file.name
-                                })
-                            });
-                            const data = await response.json();
-                            if (data.success) {
-                                templates.push({ name: file.name, data: e.target.result });
+                        const img = new Image();
+                        img.onload = async function() {
+                            try {
+                                const response = await fetch('/api/module2/add_template', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        image: e.target.result,
+                                        name: file.name.replace(/\.[^/.]+$/, "")
+                                    })
+                                });
+                                const data = await response.json();
+                                if (data.success) {
+                                    templates.push({ 
+                                        name: file.name.replace(/\.[^/.]+$/, ""), 
+                                        data: e.target.result,
+                                        width: img.width,
+                                        height: img.height
+                                    });
+                                    templateData.push(e.target.result);
+                                }
+                            } catch (err) {
+                                console.error('Error:', err);
                             }
-                        } catch (err) {
-                            console.error('Error loading template:', err);
-                        }
-                        resolve();
+                            resolve();
+                        };
+                        img.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
                 });
@@ -162,22 +349,45 @@
 
         function updateTemplatesList() {
             const listDiv = document.getElementById('templateList');
-            const countSpan = document.getElementById('templateCount');
+            document.getElementById('templateCount').textContent = templates.length;
             
-            countSpan.textContent = templates.length;
             listDiv.innerHTML = templates.map((t, i) => `
-                <div style="text-align: center;">
-                    <img src="${t.data}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid rgba(0, 247, 255, 0.3);">
-                    <div style="font-size: 11px; color: #8892b0; margin-top: 4px;">${i + 1}. ${t.name}</div>
+                <div class="template-preview">
+                    <img src="${t.data}" alt="${t.name}">
+                    <div class="info">
+                        <div class="name">${t.name}</div>
+                        <div class="size">${t.width} × ${t.height}px</div>
+                    </div>
+                    <button class="remove-btn" onclick="removeTemplate(${i})">✕</button>
                 </div>
             `).join('');
         }
 
-        function clearTemplates() {
+        async function removeTemplate(index) {
+            templates.splice(index, 1);
+            templateData.splice(index, 1);
+            
+            await fetch('/api/module2/clear_templates', { method: 'POST' });
+            for (let i = 0; i < templates.length; i++) {
+                await fetch('/api/module2/add_template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: templateData[i], name: templates[i].name })
+                });
+            }
+            
+            updateTemplatesList();
+            updateMatchButton();
+        }
+
+        async function clearTemplates() {
             templates = [];
+            templateData = [];
+            await fetch('/api/module2/clear_templates', { method: 'POST' });
             updateTemplatesList();
             updateMatchButton();
             document.getElementById('templateInput').value = '';
+            document.getElementById('matchResults').innerHTML = '';
         }
 
         function loadScene(event) {
@@ -191,8 +401,7 @@
                     const canvas = document.getElementById('sceneCanvas');
                     canvas.width = img.width;
                     canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
+                    canvas.getContext('2d').drawImage(img, 0, 0);
                     sceneImage = e.target.result;
                     updateMatchButton();
                 }
@@ -212,37 +421,43 @@
             const progressFill = document.getElementById('matchProgressFill');
             const progressText = document.getElementById('matchProgressText');
             const spinner = document.getElementById('matchSpinner');
+            const matchBtn = document.getElementById('matchBtn');
             
+            matchBtn.disabled = true;
             progressContainer.classList.add('active');
             spinner.classList.add('active');
             
             progressFill.style.width = '20%';
             progressFill.textContent = '20%';
-            progressText.textContent = 'Matching templates...';
+            progressText.textContent = 'Matching template...';
 
             try {
+                const threshold = parseFloat(document.getElementById('threshold').value);
+
                 const response = await fetch('/api/module2/match_templates', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: sceneImage })
+                    body: JSON.stringify({ 
+                        image: sceneImage,
+                        threshold: threshold
+                    })
                 });
                 
                 progressFill.style.width = '80%';
                 progressFill.textContent = '80%';
-                progressText.textContent = 'Drawing bounding boxes...';
+                progressText.textContent = 'Drawing results...';
                 
                 const data = await response.json();
 
                 if (data.success) {
                     progressFill.style.width = '100%';
                     progressFill.textContent = '100%';
-                    progressText.textContent = 'Complete!';
+                    progressText.textContent = 'Done!';
                     
                     displayMatchResults(data.matches);
-                    
-                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                    setTimeout(() => progressContainer.classList.remove('active'), 1000);
                 } else {
-                    alert('Matching failed: ' + (data.message || 'Unknown error'));
+                    alert('Error: ' + (data.message || 'Unknown error'));
                     progressContainer.classList.remove('active');
                 }
             } catch (err) {
@@ -250,6 +465,7 @@
                 progressContainer.classList.remove('active');
             } finally {
                 spinner.classList.remove('active');
+                matchBtn.disabled = false;
             }
         }
 
@@ -257,38 +473,38 @@
             const resultsDiv = document.getElementById('matchResults');
             
             if (!matches || matches.length === 0) {
-                resultsDiv.innerHTML = '<div class="info-box">No matches found.</div>';
+                resultsDiv.innerHTML = '<div class="info-box">No templates loaded.</div>';
                 return;
             }
             
-            resultsDiv.innerHTML = `
-                <div class="stats" style="margin-top: 24px;">
-                    <h3>Detection Results</h3>
-                    <div class="stat-item">
-                        <span class="stat-label">Templates Matched:</span>
-                        <span class="stat-value">${matches.length}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Total Detections:</span>
-                        <span class="stat-value">${matches.reduce((sum, m) => sum + m.num_detections, 0)}</span>
-                    </div>
-                </div>
-                <div class="results-grid" style="margin-top: 24px;">
-                    ${matches.map(m => `
-                        <div class="result-card">
-                            <h4>${m.name}</h4>
-                            <div class="stat-item">
-                                <span class="stat-label">Detections:</span>
-                                <span class="stat-value">${m.num_detections}</span>
-                            </div>
-                            <img src="${m.result_image}" alt="${m.name}">
-                            <button class="btn-secondary" onclick="downloadImage('${m.result_image}', '${m.name}_detected.jpg')">Download</button>
+            let html = '';
+            
+            for (const m of matches) {
+                const det = m.detections[0];
+                const confidence = det ? (det.confidence * 100).toFixed(1) : 0;
+                
+                html += `
+                    <div style="margin-top: 24px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(0, 247, 255, 0.2);">
+                        <h4 style="margin: 0 0 16px 0; color: #ccd6f6;">
+                            ${m.name}
+                            <span class="detection-badge">${confidence}% confidence</span>
+                        </h4>
+                        
+                        <img src="${m.result_image}" alt="Result" style="width: 100%; border-radius: 8px; border: 1px solid rgba(0, 247, 255, 0.2);">
+                        
+                        <div style="margin-top: 16px;">
+                            <button class="btn-secondary" onclick="downloadImage('${m.result_image}', '${m.name}_result.jpg')">
+                                📥 Download Result
+                            </button>
                         </div>
-                    `).join('')}
-                </div>
-            `;
+                    </div>
+                `;
+            }
+            
+            resultsDiv.innerHTML = html;
         }
 
+        // Fourier Functions
         function loadFourierImage(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -310,7 +526,7 @@
 
         function updateLabels() {
             document.getElementById('kernelLabel').textContent = document.getElementById('kernelSize').value;
-            document.getElementById('sigmaLabel').textContent = document.getElementById('sigma').value;
+            document.getElementById('sigmaLabel').textContent = parseFloat(document.getElementById('sigma').value).toFixed(1);
         }
 
         async function processBlurRestore() {
@@ -336,12 +552,7 @@
                 const response = await fetch('/api/module2/blur_restore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image: fourierImage,
-                        kernel_size: kernelSize,
-                        sigma: sigma,
-                        method: method
-                    })
+                    body: JSON.stringify({ image: fourierImage, kernel_size: kernelSize, sigma: sigma, method: method })
                 });
                 
                 progressFill.style.width = '70%';
@@ -353,12 +564,12 @@
                 if (data.success) {
                     progressFill.style.width = '100%';
                     progressFill.textContent = '100%';
-                    progressText.textContent = 'Complete!';
+                    progressText.textContent = 'Done!';
                     
                     displayFourierResults(data);
-                    setTimeout(() => progressContainer.classList.remove('active'), 1500);
+                    setTimeout(() => progressContainer.classList.remove('active'), 1000);
                 } else {
-                    alert('Processing failed: ' + (data.message || 'Unknown error'));
+                    alert('Error: ' + (data.message || 'Unknown error'));
                     progressContainer.classList.remove('active');
                 }
             } catch (err) {
@@ -370,25 +581,19 @@
         }
 
         function displayFourierResults(data) {
-            const resultsDiv = document.getElementById('fourierResults');
-            const kernelSize = data.kernel_size || 15;
-            const sigma = data.sigma || 3.0;
-            
-            resultsDiv.innerHTML = `
+            document.getElementById('fourierResults').innerHTML = `
                 <div class="result-card">
-                    <h4>Original Image</h4>
+                    <h4>Original</h4>
                     <img src="${data.original}" alt="Original">
                     <button class="btn-secondary" onclick="downloadImage('${data.original}', 'original.jpg')">Download</button>
                 </div>
                 <div class="result-card">
-                    <h4>Blurred Image</h4>
-                    <p style="color: #8892b0; font-size: 13px;">Kernel: ${kernelSize}px, Sigma: ${sigma}</p>
+                    <h4>Blurred (${data.kernel_size}px, σ=${data.sigma})</h4>
                     <img src="${data.blurred}" alt="Blurred">
                     <button class="btn-secondary" onclick="downloadImage('${data.blurred}', 'blurred.jpg')">Download</button>
                 </div>
                 <div class="result-card">
-                    <h4>Restored Image</h4>
-                    <p style="color: #8892b0; font-size: 13px;">Method: ${data.method === 'wiener' ? 'Wiener Filter' : 'Richardson-Lucy'}</p>
+                    <h4>Restored (${data.method === 'wiener' ? 'Wiener' : 'RL'})</h4>
                     <img src="${data.restored}" alt="Restored">
                     <button class="btn-secondary" onclick="downloadImage('${data.restored}', 'restored.jpg')">Download</button>
                 </div>
@@ -402,11 +607,10 @@
             link.click();
         }
 
-        window.addEventListener('beforeunload', () => {
-            templates = [];
-            sceneImage = null;
-            fourierImage = null;
+        window.addEventListener('beforeunload', async () => {
+            await fetch('/api/module2/clear_templates', { method: 'POST' });
         });
     </script>
 </body>
 </html>
+
