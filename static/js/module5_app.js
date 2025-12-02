@@ -41,6 +41,16 @@ function initializeUI() {
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
+    
+    // NPZ file selection handler
+    const sam2FileInput = document.getElementById('sam2FileHidden');
+    if (sam2FileInput) {
+        sam2FileInput.addEventListener('change', function() {
+            const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+            document.getElementById('sam2FileName').textContent = fileName;
+            document.getElementById('loadSam2Btn').disabled = !this.files[0];
+        });
+    }
 }
 
 function onModeChange() {
@@ -232,26 +242,37 @@ function captureTemplate(rect) {
 }
 
 async function loadSAM2File() {
-    const fileInput = document.getElementById('sam2File');
+    const fileInput = document.getElementById('sam2FileHidden');
     const file = fileInput.files[0];
     
     if (!file) {
-        alert('Please select an NPZ file');
+        alert('Please select an NPZ file first');
         return;
     }
+    
+    updateStatus('Loading SAM2 file...');
+    document.getElementById('loadSam2Btn').disabled = true;
+    document.getElementById('loadSam2Btn').textContent = 'Loading...';
     
     const reader = new FileReader();
     reader.onload = async function(e) {
         try {
-            updateStatus('Loading SAM2 file...');
             await tracker.loadSAM2Data(e.target.result);
             
             const maskCount = tracker.sam2Masks ? tracker.sam2Masks.length : 0;
             updateStatus(`SAM2 file loaded: ${maskCount} mask(s) ready`);
+            document.getElementById('loadSam2Btn').textContent = '✓ Loaded';
         } catch (err) {
             console.error('Error loading SAM2 file:', err);
             updateStatus('Error loading SAM2 file: ' + err.message);
+            document.getElementById('loadSam2Btn').disabled = false;
+            document.getElementById('loadSam2Btn').textContent = 'Load Segmentation';
         }
+    };
+    reader.onerror = function() {
+        updateStatus('Error reading file');
+        document.getElementById('loadSam2Btn').disabled = false;
+        document.getElementById('loadSam2Btn').textContent = 'Load Segmentation';
     };
     reader.readAsArrayBuffer(file);
 }

@@ -44,9 +44,15 @@
             </div>
 
             <div id="sam2Controls" style="display: none; margin: 16px 0; padding: 16px; background: rgba(100, 255, 218, 0.1); border-radius: 8px;">
-                <label style="display: block; margin-bottom: 8px; color: #64ffda; font-weight: 600;">Load SAM2 NPZ File:</label>
-                <input type="file" id="sam2File" accept=".npz" style="margin-right: 10px; padding: 8px;">
-                <button class="btn-secondary" onclick="loadSAM2File()">Load Segmentation</button>
+                <label style="display: block; margin-bottom: 12px; color: #64ffda; font-weight: 600;">Load SAM2 NPZ File:</label>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <input type="file" id="sam2FileHidden" accept=".npz,application/octet-stream" style="display: none;">
+                    <button class="btn-primary" onclick="document.getElementById('sam2FileHidden').click()" style="min-width: 150px;">
+                        📁 Select NPZ File
+                    </button>
+                    <span id="sam2FileName" style="color: #8892b0; font-size: 13px;">No file selected</span>
+                    <button class="btn-secondary" onclick="loadSAM2File()" id="loadSam2Btn" disabled>Load Segmentation</button>
+                </div>
             </div>
 
             <div class="progress-container" id="progressContainer">
