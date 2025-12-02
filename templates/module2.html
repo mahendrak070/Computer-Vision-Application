@@ -165,19 +165,19 @@
 
         <div id="templateTab" class="tab-content active">
             <div class="section">
-                <h2>🎯 Template Matching</h2>
+                <h2>Template Matching</h2>
                 <div class="info-box">
                     <strong>How it works:</strong> Upload a template image and a scene image. 
                     The system uses <code>cv.matchTemplate()</code> with <strong>TM_CCOEFF_NORMED</strong> 
                     (normalized cross-correlation) to find the template in the scene.
                     <br><br>
-                    <strong>Output:</strong> Clean white rectangle around detected object (like OpenCV tutorial).
+                    <strong>Output:</strong> White rectangle around detected object with confidence score.
                 </div>
 
                 <div class="grid">
                     <!-- Left Column: Templates -->
                     <div>
-                        <h3>📋 Template Image</h3>
+                        <h3>Template Image</h3>
                         <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)" style="display:none">
                         <div class="controls">
                             <button class="btn-primary" onclick="document.getElementById('templateInput').click()">+ Add Template</button>
@@ -194,7 +194,7 @@
 
                     <!-- Right Column: Scene -->
                     <div>
-                        <h3>🖼️ Scene Image</h3>
+                        <h3>Scene Image</h3>
                         <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)" style="display:none">
                         <div class="controls">
                             <button class="btn-primary" onclick="document.getElementById('sceneInput').click()">Upload Scene</button>
