@@ -5,6 +5,95 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Module 1 - Dimension Estimation</title>
     <link rel="stylesheet" href="/static/css/module.css">
+    <style>
+        .formula-box {
+            background: rgba(100, 255, 218, 0.08);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .formula-box .formula {
+            font-size: 18px;
+            color: #64ffda;
+            text-align: center;
+            margin: 8px 0;
+        }
+        .formula-box .description {
+            font-size: 12px;
+            color: #8892b0;
+            margin-top: 8px;
+        }
+        .param-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .param-item {
+            background: rgba(10, 14, 39, 0.5);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .param-item .label {
+            color: #8892b0;
+            display: block;
+        }
+        .param-item .value {
+            color: #64ffda;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        .measurement-result {
+            background: rgba(100, 255, 218, 0.1);
+            border-left: 3px solid #64ffda;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .measurement-result .segment-name {
+            color: #ffffff;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .measurement-result .values {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .measurement-result .value-item {
+            font-size: 13px;
+        }
+        .measurement-result .value-item .num {
+            color: #64ffda;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        .total-result {
+            background: linear-gradient(135deg, rgba(100, 255, 218, 0.15), rgba(100, 255, 218, 0.05));
+            border: 1px solid rgba(100, 255, 218, 0.4);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+        .total-result h4 {
+            color: #64ffda;
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+        .total-result .big-value {
+            font-size: 28px;
+            color: #ffffff;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        .total-result .unit {
+            color: #8892b0;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -14,26 +103,33 @@
 
     <div class="container">
         <div class="section">
-            <h2>Dimension Estimation</h2>
+            <h2>Perspective Projection Method</h2>
+            
+            <div class="formula-box">
+                <div class="formula">W<sub>real</sub> = (W<sub>pixel</sub> × D) / f</div>
+                <div class="description">
+                    <strong>Where:</strong><br>
+                    • W<sub>real</sub> = Real-world dimension of the object<br>
+                    • W<sub>pixel</sub> = Pixel dimension measured in the image<br>
+                    • D = Distance from camera to object (5 inches)<br>
+                    • f = Focal length from camera calibration (4053.12 px)
+                </div>
+            </div>
+
             <div class="info-box">
-                <strong>How it works:</strong> This module measures real-world dimensions using camera calibration and perspective projection. Lens distortion is automatically corrected.
-                <br><br>
                 <strong>Instructions:</strong>
                 <ol style="margin: 8px 0 0 20px; line-height: 1.8;">
-                    <li>Upload an image - it will be automatically undistorted</li>
-                    <li><strong>FIRST:</strong> Click 2 points on an object</li>
-                    <li>Enter the actual length in (inches)"</li>
-                    <li>Click <strong>"Calibrate"</strong> to set the scale</li>
-                    <li>Now click additional points to measure other distances (up to 4 points total)</li>
-                    <li>All measurements will be calculated based on the calibrated scale</li>
-                    <li>Click Reset to start over</li>
+                    <li>Ensure the object is <strong>5 inches</strong> away from the camera</li>
+                    <li>Upload an image - lens distortion will be automatically corrected</li>
+                    <li>Click points on the object to measure dimensions (up to 4 points)</li>
+                    <li>Real-world dimensions are calculated using perspective projection</li>
                 </ol>
             </div>
 
             <div class="controls">
                 <input type="file" id="imageInput" accept="image/*" onchange="loadImage(event)" style="display: none;">
                 <button class="btn-primary" onclick="document.getElementById('imageInput').click()">Upload Image</button>
-                <button class="btn-secondary" onclick="resetCalculation()">Reset</button>
+                <button class="btn-secondary" onclick="resetCalculation()">Reset Points</button>
                 <span id="loadingIndicator" style="display: none; margin-left: 16px; color: #64ffda;">
                     Processing image...
                 </span>
@@ -43,25 +139,41 @@
                 <div>
                     <h3>Image Canvas <span style="font-size: 12px; color: #64ffda; font-weight: normal;">(Lens distortion corrected)</span></h3>
                     <canvas id="canvas" width="800" height="600" style="cursor: crosshair;"></canvas>
+                    <div style="margin-top: 8px; font-size: 12px; color: #8892b0;">
+                        Click on the image to mark measurement points. Lines will be drawn between consecutive points.
+                    </div>
                 </div>
                 <div>
                     <div class="stats">
-                        <h3>Calibration</h3>
-                        <div>
-                            <label>Known Length (inches):</label>
-                            <input type="number" id="referenceLength" value="4" min="0.1" step="0.1">
+                        <h3>Camera Parameters</h3>
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <span class="label">Focal Length (f)</span>
+                                <span class="value" id="focalLength">4053.12 px</span>
+                            </div>
+                            <div class="param-item">
+                                <span class="label">Distance (D)</span>
+                                <span class="value" id="cameraDistance">5.0 inches</span>
+                            </div>
+                            <div class="param-item">
+                                <span class="label">fx</span>
+                                <span class="value">4053.13 px</span>
+                            </div>
+                            <div class="param-item">
+                                <span class="label">fy</span>
+                                <span class="value">4051.55 px</span>
+                            </div>
                         </div>
                         <div style="margin-top: 12px;">
-                            <button class="btn-primary" onclick="setReference()" id="setRefBtn" disabled>Calibrate</button>
-                            <small style="display: block; margin-top: 8px; font-size: 11px; color: #64ffda;" id="calibStatus">Click 2 points first</small>
-                        </div>
-                        <div style="margin-top: 12px;">
-                            <label>Scale Factor (px/in):</label>
-                            <input type="text" id="scaleFactor" value="Not calibrated" readonly style="background: rgba(100, 255, 218, 0.05); cursor: not-allowed;">
+                            <label style="font-size: 12px; color: #8892b0;">Adjust Distance (if different):</label>
+                            <input type="number" id="distanceInput" value="5" min="1" max="100" step="0.5" 
+                                   style="width: 80px; margin-left: 8px;" onchange="updateMeasurements()">
+                            <span style="color: #8892b0; font-size: 12px;">inches</span>
                         </div>
                     </div>
+                    
                     <div class="stats" style="margin-top: 16px;">
-                        <h3>Results</h3>
+                        <h3>Measurements</h3>
                         <div class="stat-item">
                             <span class="stat-label">Points Selected:</span>
                             <span class="stat-value" id="pointCount">0/4</span>
@@ -69,13 +181,6 @@
                         <div id="measurementsContainer"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="progress-container" id="progressContainer">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill">0%</div>
-                </div>
-                <div class="progress-text" id="progressText">Processing...</div>
             </div>
         </div>
     </div>
@@ -85,9 +190,12 @@
         const ctx = canvas.getContext('2d');
         let points = [];
         let image = null;
-        let pixelsPerInch = null;
-        let isCalibrated = false;
-
+        let originalImageWidth = 0;
+        let originalImageHeight = 0;
+        
+        // Camera calibration parameters
+        const FOCAL_LENGTH = 4053.12;  // Average of fx and fy
+        
         async function loadImage(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -102,11 +210,13 @@
                 const loadOriginalImage = () => {
                     image = new Image();
                     image.onload = function() {
+                        originalImageWidth = image.width;
+                        originalImageHeight = image.height;
                         canvas.width = Math.min(image.width, 800);
                         canvas.height = (canvas.width / image.width) * image.height;
                         drawImage();
                         loadingIndicator.style.display = 'none';
-                        console.log('✅ Image loaded (original)');
+                        console.log(`✅ Image loaded: ${originalImageWidth}x${originalImageHeight}, displayed at ${canvas.width}x${canvas.height}`);
                     };
                     image.onerror = function() {
                         loadingIndicator.style.display = 'none';
@@ -134,6 +244,8 @@
                     if (data.success && data.undistorted_image) {
                         image = new Image();
                         image.onload = function() {
+                            originalImageWidth = image.width;
+                            originalImageHeight = image.height;
                             canvas.width = Math.min(image.width, 800);
                             canvas.height = (canvas.width / image.width) * image.height;
                             drawImage();
@@ -151,7 +263,6 @@
                     }
                 } catch (error) {
                     console.error('❌ Error during undistortion:', error);
-                    console.log('🔄 Falling back to original image');
                     loadOriginalImage();
                 }
             };
@@ -168,44 +279,87 @@
         }
 
         function drawPoints() {
+            // Draw lines between consecutive points
+            if (points.length >= 2) {
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.strokeStyle = '#64ffda';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#64ffda';
+                ctx.shadowBlur = 10;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                // Draw measurement labels on lines
+                for (let i = 0; i < points.length - 1; i++) {
+                    const midX = (points[i].x + points[i + 1].x) / 2;
+                    const midY = (points[i].y + points[i + 1].y) / 2;
+                    
+                    const measurement = calculateSegmentMeasurement(points[i], points[i + 1]);
+                    
+                    // Background for text
+                    ctx.fillStyle = 'rgba(10, 14, 39, 0.85)';
+                    ctx.fillRect(midX - 45, midY - 20, 90, 24);
+                    
+                    // Measurement text
+                    ctx.fillStyle = '#64ffda';
+                    ctx.font = 'bold 12px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${measurement.inches.toFixed(3)}"`, midX, midY - 4);
+                }
+            }
+            
+            // Draw points
             points.forEach((point, index) => {
+                // Outer glow
                 ctx.shadowColor = '#00f7ff';
                 ctx.shadowBlur = 15;
                 
+                // Main point
                 ctx.fillStyle = '#00f7ff';
                 ctx.beginPath();
-                ctx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
+                ctx.arc(point.x, point.y, 10, 0, 2 * Math.PI);
                 ctx.fill();
                 
                 ctx.shadowBlur = 0;
+                
+                // Inner point
                 ctx.fillStyle = '#0a0e27';
                 ctx.beginPath();
-                ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+                ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
                 ctx.fill();
                 
+                // Point number
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 16px Inter';
-                ctx.strokeStyle = '#0a0e27';
-                ctx.lineWidth = 3;
-                ctx.strokeText(index + 1, point.x + 12, point.y - 8);
-                ctx.fillText(index + 1, point.x + 12, point.y - 8);
+                ctx.font = 'bold 14px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText((index + 1).toString(), point.x, point.y + 4);
             });
-
-            for (let i = 0; i < points.length - 1; i++) {
-                ctx.shadowColor = '#64ffda';
-                ctx.shadowBlur = 10;
-                ctx.beginPath();
-                ctx.moveTo(points[i].x, points[i].y);
-                ctx.lineTo(points[i + 1].x, points[i + 1].y);
-                ctx.strokeStyle = '#64ffda';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
+        }
+        
+        function calculateSegmentMeasurement(p1, p2) {
+            // Calculate scale factor between canvas and original image
+            const scaleFactor = originalImageWidth / canvas.width;
             
-            if (points.length >= 2) {
-                calculateDistances();
-            }
+            // Pixel distance in original image coordinates
+            const dx = (p2.x - p1.x) * scaleFactor;
+            const dy = (p2.y - p1.y) * scaleFactor;
+            const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Get distance from input
+            const distance = parseFloat(document.getElementById('distanceInput').value) || 5;
+            
+            // Perspective projection: W_real = (W_pixel × D) / f
+            const realInches = (pixelDistance * distance) / FOCAL_LENGTH;
+            
+            return {
+                pixels: pixelDistance,
+                inches: realInches,
+                mm: realInches * 25.4
+            };
         }
 
         canvas.addEventListener('click', function(e) {
@@ -220,102 +374,96 @@
             
             points.push({ x, y });
             document.getElementById('pointCount').textContent = `${points.length}/4`;
+            
             drawImage();
+            updateMeasurements();
             
-            if (points.length === 2 && !isCalibrated) {
-                document.getElementById('setRefBtn').disabled = false;
-                document.getElementById('calibStatus').textContent = 'Ready! Click "Calibrate"';
-                document.getElementById('calibStatus').style.color = '#00f7ff';
-            }
-            
-            console.log(`Point ${points.length} added at (${x.toFixed(2)}, ${y.toFixed(2)})`);
+            console.log(`Point ${points.length} added at canvas(${x.toFixed(2)}, ${y.toFixed(2)})`);
         });
         
-        function setReference() {
-            if (points.length < 2) {
-                alert('Please click 2 points first!');
-                return;
-            }
-            
-            const dx = points[1].x - points[0].x;
-            const dy = points[1].y - points[0].y;
-            const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-            
-            const refLength = parseFloat(document.getElementById('referenceLength').value);
-            pixelsPerInch = pixelDistance / refLength;
-            isCalibrated = true;
-            
-            document.getElementById('scaleFactor').value = pixelsPerInch.toFixed(2);
-            document.getElementById('calibStatus').textContent = '✓ Calibrated! Add more points to measure';
-            document.getElementById('calibStatus').style.color = '#64ffda';
-            document.getElementById('setRefBtn').disabled = true;
-            
-            calculateDistances();
-            
-            console.log(`✅ Calibrated: ${pixelsPerInch.toFixed(2)} px/inch`);
-        }
-
-        function calculateDistances() {
+        function updateMeasurements() {
             const container = document.getElementById('measurementsContainer');
             container.innerHTML = '';
             
-            if (!isCalibrated) {
-                const warningDiv = document.createElement('div');
-                warningDiv.className = 'stat-item';
-                warningDiv.innerHTML = `
-                    <span class="stat-label" style="color: #ff6b6b;">⚠ Not calibrated</span>
-                    <span class="stat-value">Calibrate first</span>
+            if (points.length < 2) {
+                container.innerHTML = `
+                    <div style="color: #8892b0; font-size: 13px; padding: 12px 0;">
+                        Click at least 2 points on the image to measure distance.
+                    </div>
                 `;
-                container.appendChild(warningDiv);
                 return;
             }
             
-            let totalPixels = 0;
-            let totalReal = 0;
+            const distance = parseFloat(document.getElementById('distanceInput').value) || 5;
+            document.getElementById('cameraDistance').textContent = `${distance} inches`;
             
+            let totalPixels = 0;
+            let totalInches = 0;
+            
+            // Calculate each segment
             for (let i = 0; i < points.length - 1; i++) {
-                const dx = points[i + 1].x - points[i].x;
-                const dy = points[i + 1].y - points[i].y;
-                const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-                
-                const realDistance_in = pixelDistance / pixelsPerInch;
-                
-                totalPixels += pixelDistance;
-                totalReal += realDistance_in;
+                const measurement = calculateSegmentMeasurement(points[i], points[i + 1]);
+                totalPixels += measurement.pixels;
+                totalInches += measurement.inches;
                 
                 const measureDiv = document.createElement('div');
-                measureDiv.className = 'stat-item';
+                measureDiv.className = 'measurement-result';
                 measureDiv.innerHTML = `
-                    <span class="stat-label">Segment ${i + 1} (${i + 1}→${i + 2}):</span>
-                    <span class="stat-value">${pixelDistance.toFixed(2)} px | ${realDistance_in.toFixed(3)} in</span>
+                    <div class="segment-name">Segment ${i + 1}: Point ${i + 1} → Point ${i + 2}</div>
+                    <div class="values">
+                        <div class="value-item">
+                            <span class="num">${measurement.pixels.toFixed(2)}</span> px
+                        </div>
+                        <div class="value-item">
+                            <span class="num">${measurement.inches.toFixed(4)}</span> inches
+                        </div>
+                        <div class="value-item">
+                            <span class="num">${measurement.mm.toFixed(2)}</span> mm
+                        </div>
+                    </div>
                 `;
                 container.appendChild(measureDiv);
             }
             
+            // Total measurement
             if (points.length >= 2) {
                 const totalDiv = document.createElement('div');
-                totalDiv.className = 'stat-item';
-                totalDiv.style.marginTop = '12px';
-                totalDiv.style.borderTop = '1px solid rgba(100, 255, 218, 0.2)';
-                totalDiv.style.paddingTop = '12px';
+                totalDiv.className = 'total-result';
                 totalDiv.innerHTML = `
-                    <span class="stat-label" style="color: #64ffda; font-weight: 600;">Total Distance:</span>
-                    <span class="stat-value" style="color: #64ffda; font-weight: 600;">${totalPixels.toFixed(2)} px | ${totalReal.toFixed(3)} in</span>
+                    <h4>Total Measured Distance</h4>
+                    <div style="display: flex; gap: 24px; align-items: baseline; flex-wrap: wrap;">
+                        <div>
+                            <span class="big-value">${totalInches.toFixed(4)}</span>
+                            <span class="unit">inches</span>
+                        </div>
+                        <div>
+                            <span class="big-value" style="font-size: 20px;">${(totalInches * 25.4).toFixed(2)}</span>
+                            <span class="unit">mm</span>
+                        </div>
+                        <div>
+                            <span class="big-value" style="font-size: 20px;">${totalPixels.toFixed(2)}</span>
+                            <span class="unit">pixels</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #8892b0;">
+                        Calculated using: W<sub>real</sub> = (${totalPixels.toFixed(2)} × ${distance}) / ${FOCAL_LENGTH}
+                    </div>
                 `;
                 container.appendChild(totalDiv);
             }
+            
+            // Redraw to show labels
+            drawImage();
         }
 
         function resetPoints() {
             points = [];
-            pixelsPerInch = null;
-            isCalibrated = false;
             document.getElementById('pointCount').textContent = '0/4';
-            document.getElementById('measurementsContainer').innerHTML = '';
-            document.getElementById('scaleFactor').value = 'Not calibrated';
-            document.getElementById('calibStatus').textContent = 'Click 2 points first';
-            document.getElementById('calibStatus').style.color = '#64ffda';
-            document.getElementById('setRefBtn').disabled = true;
+            document.getElementById('measurementsContainer').innerHTML = `
+                <div style="color: #8892b0; font-size: 13px; padding: 12px 0;">
+                    Click at least 2 points on the image to measure distance.
+                </div>
+            `;
         }
 
         function resetCalculation() {
