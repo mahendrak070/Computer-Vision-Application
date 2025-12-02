@@ -11,7 +11,7 @@ Where:
     - Distance: Known distance from camera to object
     - Focal_Length: Focal length from camera calibration matrix
 
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import cv2

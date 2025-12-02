@@ -1,6 +1,6 @@
 """
 Production Configuration
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import os

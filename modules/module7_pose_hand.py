@@ -1,6 +1,6 @@
 """
 Module 7: Stereo Calibration, Pose Estimation, and Hand Tracking
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import cv2

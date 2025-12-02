@@ -1,6 +1,6 @@
 """
 API Routes for CV Modules
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 from flask import request, jsonify, send_file, session

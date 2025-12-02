@@ -1,6 +1,6 @@
 """
 Module 4: Image Stitching and SIFT from Scratch
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import cv2

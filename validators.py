@@ -1,6 +1,6 @@
 """
 Input Validation and Sanitization
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import re

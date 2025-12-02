@@ -1,6 +1,6 @@
 """
 Module 2: Template Matching and Fourier Restoration
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 import cv2

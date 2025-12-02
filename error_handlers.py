@@ -1,6 +1,6 @@
 """
 Comprehensive Error Handlers
-Authors: Mahendra Krishna Koneru and Sai Leenath Jampala
+Author: Mahendra Krishna Koneru
 """
 
 from flask import jsonify, render_template, request

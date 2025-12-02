@@ -2,7 +2,7 @@
 
 **Live Demo:** [https://computervision.up.railway.app/](https://computervision.up.railway.app/)
 
-**Authors:** Mahendra Krishna Koneru and Sai Leenath Jampala
+**Author:** Mahendra Krishna Koneru
 
 A production-ready web-based computer vision platform featuring real-time tracking, image processing, SIFT stitching, dimension estimation, and advanced CV algorithms.
 
@@ -270,7 +270,7 @@ SECRET_KEY=your-secret-key
 
 ## 📝 License
 
-Educational project by Mahendra Krishna Koneru and Sai Leenath Jampala (2025)
+Educational project by Mahendra Krishna Koneru (2025)
 
 ---
 
