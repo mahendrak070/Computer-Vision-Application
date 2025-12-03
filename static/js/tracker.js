@@ -3,9 +3,9 @@
 class ObjectTracker {
     constructor() {
         this.trackingMode = 'marker';
-        this.isTracking = false;
         this.template = null;
-        this.templateRect = null;
+        this.templateGray = null;
+        this.lastPosition = null;
         this.sam2Data = null;
         this.sam2Masks = [];
         this.sam2Centroids = [];
@@ -23,75 +23,65 @@ class ObjectTracker {
         if (this.template) {
             try { this.template.delete(); } catch(e) {}
         }
+        if (this.templateGray) {
+            try { this.templateGray.delete(); } catch(e) {}
+        }
         this.template = null;
-        this.templateRect = null;
+        this.templateGray = null;
+        this.lastPosition = null;
         this.sam2Data = null;
         this.sam2Masks = [];
         this.sam2Centroids = [];
     }
     
-    // ========== MARKER-BASED TRACKING (ArUco-like squares) ==========
+    // ========== MARKER-BASED TRACKING ==========
     trackMarker(src, dst) {
         let found = false;
         let count = 0;
         
         try {
-            // Convert to grayscale
             const gray = new cv.Mat();
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
             
-            // Apply binary threshold - look for high contrast markers
             const thresh = new cv.Mat();
             cv.threshold(gray, thresh, 100, 255, cv.THRESH_BINARY);
             
-            // Find contours
             const contours = new cv.MatVector();
             const hierarchy = new cv.Mat();
             cv.findContours(thresh, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
             
-            // Frame dimensions for filtering
             const frameArea = src.rows * src.cols;
-            const minArea = frameArea * 0.005;  // Min 0.5% of frame
-            const maxArea = frameArea * 0.3;    // Max 30% of frame
+            const minArea = frameArea * 0.005;
+            const maxArea = frameArea * 0.3;
             
             for (let i = 0; i < contours.size(); i++) {
                 const contour = contours.get(i);
                 const area = cv.contourArea(contour);
                 
-                // Filter by area
                 if (area < minArea || area > maxArea) continue;
                 
-                // Approximate to polygon
                 const epsilon = 0.04 * cv.arcLength(contour, true);
                 const approx = new cv.Mat();
                 cv.approxPolyDP(contour, approx, epsilon, true);
                 
-                // Must be exactly 4 corners (quadrilateral)
-                if (approx.rows === 4) {
-                    // Check if convex
-                    if (cv.isContourConvex(approx)) {
-                        const rect = cv.boundingRect(approx);
-                        const aspectRatio = rect.width / rect.height;
+                if (approx.rows === 4 && cv.isContourConvex(approx)) {
+                    const rect = cv.boundingRect(approx);
+                    const aspectRatio = rect.width / rect.height;
+                    
+                    if (aspectRatio > 0.8 && aspectRatio < 1.2) {
+                        const boundingArea = rect.width * rect.height;
+                        const fillRatio = area / boundingArea;
                         
-                        // Must be roughly square (aspect ratio 0.8 to 1.2)
-                        if (aspectRatio > 0.8 && aspectRatio < 1.2) {
-                            // Check fill ratio (area should match bounding rect closely)
-                            const boundingArea = rect.width * rect.height;
-                            const fillRatio = area / boundingArea;
-                            
-                            // Good markers have fill ratio > 0.8
-                            if (fillRatio > 0.75) {
-                                this.drawMarkerDetection(dst, rect);
-                                found = true;
-                                count++;
-                            }
+                        if (fillRatio > 0.75) {
+                            this.drawDetection(dst, rect, [0, 255, 0, 255]);
+                            found = true;
+                            count++;
                         }
                     }
                 }
                 approx.delete();
             }
             
-            // Cleanup
             gray.delete();
             thresh.delete();
             contours.delete();
@@ -104,150 +94,155 @@ class ObjectTracker {
         return { found, count };
     }
     
-    drawMarkerDetection(dst, rect) {
-        // Green bounding box
-        cv.rectangle(dst, {x: rect.x, y: rect.y}, {x: rect.x + rect.width, y: rect.y + rect.height}, [0, 255, 0, 255], 3);
-        
-        // Yellow corners
-        const corners = [
-            {x: rect.x, y: rect.y},
-            {x: rect.x + rect.width, y: rect.y},
-            {x: rect.x + rect.width, y: rect.y + rect.height},
-            {x: rect.x, y: rect.y + rect.height}
-        ];
-        corners.forEach(c => {
-            cv.circle(dst, c, 5, [255, 255, 0, 255], -1);
-        });
-        
-        // Center point (magenta)
-        const cx = Math.round(rect.x + rect.width / 2);
-        const cy = Math.round(rect.y + rect.height / 2);
-        cv.circle(dst, {x: cx, y: cy}, 6, [255, 0, 255, 255], -1);
-    }
-    
     // ========== MARKER-LESS TRACKING (Template Matching) ==========
     setTemplate(rect, frame) {
         try {
-            // Cleanup old template
+            // Cleanup old templates
             if (this.template) {
                 try { this.template.delete(); } catch(e) {}
-                this.template = null;
             }
+            if (this.templateGray) {
+                try { this.templateGray.delete(); } catch(e) {}
+            }
+            this.template = null;
+            this.templateGray = null;
             
-            // Validate and clamp coordinates
-            const x = Math.max(0, Math.floor(rect.x));
-            const y = Math.max(0, Math.floor(rect.y));
-            let w = Math.floor(rect.width);
-            let h = Math.floor(rect.height);
+            // Validate coordinates
+            let x = Math.round(rect.x);
+            let y = Math.round(rect.y);
+            let w = Math.round(rect.width);
+            let h = Math.round(rect.height);
             
-            // Ensure within frame bounds
+            // Clamp to frame bounds
+            x = Math.max(0, x);
+            y = Math.max(0, y);
             if (x + w > frame.cols) w = frame.cols - x;
             if (y + h > frame.rows) h = frame.rows - y;
             
-            if (w < 20 || h < 20) {
-                console.warn('Template too small:', w, 'x', h);
+            console.log(`Setting template: x=${x}, y=${y}, w=${w}, h=${h}, frame=${frame.cols}x${frame.rows}`);
+            
+            if (w < 30 || h < 30) {
+                console.warn('Template too small');
                 return false;
             }
             
-            // Extract template region
+            // Extract ROI
             const roiRect = new cv.Rect(x, y, w, h);
             const roi = frame.roi(roiRect);
             this.template = roi.clone();
             roi.delete();
             
-            this.templateRect = { x, y, width: w, height: h };
+            // Pre-compute grayscale template
+            this.templateGray = new cv.Mat();
+            cv.cvtColor(this.template, this.templateGray, cv.COLOR_RGBA2GRAY);
             
-            console.log(`Template captured: ${w}x${h} at (${x}, ${y})`);
+            // Store initial position
+            this.lastPosition = { x, y, width: w, height: h };
+            
+            console.log(`Template captured: ${this.template.cols}x${this.template.rows}`);
             return true;
+            
         } catch (e) {
-            console.error('Error setting template:', e);
+            console.error('setTemplate error:', e);
             this.template = null;
+            this.templateGray = null;
             return false;
         }
     }
     
     trackMarkerless(src, dst) {
-        if (!this.template) {
+        if (!this.template || !this.templateGray) {
             return false;
         }
         
         try {
-            // Check if template is valid
-            if (this.template.empty()) {
-                console.warn('Template is empty');
-                return false;
-            }
-            
-            // Convert both to grayscale
+            // Convert source to grayscale
             const srcGray = new cv.Mat();
-            const templateGray = new cv.Mat();
-            
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
-            cv.cvtColor(this.template, templateGray, cv.COLOR_RGBA2GRAY);
             
-            // Validate sizes
-            if (templateGray.rows > srcGray.rows || templateGray.cols > srcGray.cols) {
-                console.warn('Template larger than source');
+            // Check sizes
+            if (this.templateGray.rows > srcGray.rows || this.templateGray.cols > srcGray.cols) {
                 srcGray.delete();
-                templateGray.delete();
                 return false;
             }
             
-            // Perform template matching
-            const result = new cv.Mat();
-            cv.matchTemplate(srcGray, templateGray, result, cv.TM_CCOEFF_NORMED);
+            // Template matching
+            const resultCols = srcGray.cols - this.templateGray.cols + 1;
+            const resultRows = srcGray.rows - this.templateGray.rows + 1;
+            const result = new cv.Mat(resultRows, resultCols, cv.CV_32FC1);
+            
+            cv.matchTemplate(srcGray, this.templateGray, result, cv.TM_CCOEFF_NORMED);
             
             // Find best match
             const minMax = cv.minMaxLoc(result);
-            const confidence = minMax.maxVal;
+            const maxVal = minMax.maxVal;
             const maxLoc = minMax.maxLoc;
             
-            // Cleanup
             srcGray.delete();
-            templateGray.delete();
             result.delete();
             
-            // Only show if confidence > 0.5
-            if (confidence > 0.5) {
+            // Threshold for good match
+            if (maxVal > 0.4) {
+                const x = maxLoc.x;
+                const y = maxLoc.y;
                 const w = this.template.cols;
                 const h = this.template.rows;
-                this.drawTemplateDetection(dst, maxLoc.x, maxLoc.y, w, h, confidence);
+                
+                // Update last known position
+                this.lastPosition = { x, y, width: w, height: h };
+                
+                // Draw detection with confidence
+                this.drawDetection(dst, { x, y, width: w, height: h }, [0, 255, 0, 255], maxVal);
+                
                 return true;
             }
             
+            // If match failed but we have last position, show it in red
+            if (this.lastPosition) {
+                this.drawDetection(dst, this.lastPosition, [255, 100, 100, 255], 0);
+            }
+            
             return false;
+            
         } catch (e) {
-            console.error('Template matching error:', e);
+            console.error('trackMarkerless error:', e);
             return false;
         }
     }
     
-    drawTemplateDetection(dst, x, y, w, h, confidence) {
-        // Green bounding box
-        cv.rectangle(dst, {x: x, y: y}, {x: x + w, y: y + h}, [0, 255, 0, 255], 3);
+    // ========== DRAWING HELPER ==========
+    drawDetection(dst, rect, color, confidence = null) {
+        const x = rect.x;
+        const y = rect.y;
+        const w = rect.width;
+        const h = rect.height;
         
-        // Cyan corners
-        const corners = [
-            {x: x, y: y},
-            {x: x + w, y: y},
-            {x: x + w, y: y + h},
-            {x: x, y: y + h}
-        ];
-        corners.forEach(c => {
-            cv.circle(dst, c, 5, [0, 255, 255, 255], -1);
-        });
+        // Bounding box
+        cv.rectangle(dst, {x: x, y: y}, {x: x + w, y: y + h}, color, 3);
         
-        // White center
+        // Corner circles
+        cv.circle(dst, {x: x, y: y}, 5, [255, 255, 0, 255], -1);
+        cv.circle(dst, {x: x + w, y: y}, 5, [255, 255, 0, 255], -1);
+        cv.circle(dst, {x: x + w, y: y + h}, 5, [255, 255, 0, 255], -1);
+        cv.circle(dst, {x: x, y: y + h}, 5, [255, 255, 0, 255], -1);
+        
+        // Center point
         const cx = Math.round(x + w / 2);
         const cy = Math.round(y + h / 2);
-        cv.circle(dst, {x: cx, y: cy}, 6, [255, 255, 255, 255], -1);
+        cv.circle(dst, {x: cx, y: cy}, 6, [255, 0, 255, 255], -1);
+        
+        // Crosshair
+        cv.line(dst, {x: cx - 12, y: cy}, {x: cx + 12, y: cy}, [255, 0, 255, 255], 2);
+        cv.line(dst, {x: cx, y: cy - 12}, {x: cx, y: cy + 12}, [255, 0, 255, 255], 2);
         
         // Confidence label
-        const confText = `${Math.round(confidence * 100)}%`;
-        cv.putText(dst, confText, {x: x, y: y - 10}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [0, 255, 0, 255], 2);
+        if (confidence !== null && confidence > 0) {
+            const label = `${Math.round(confidence * 100)}%`;
+            cv.putText(dst, label, {x: x, y: y - 8}, cv.FONT_HERSHEY_SIMPLEX, 0.6, color, 2);
+        }
     }
     
-    // ========== SAM2 SEGMENTATION TRACKING ==========
+    // ========== SAM2 TRACKING ==========
     async loadSAM2Data(npzData) {
         try {
             this.sam2Data = npzData;
@@ -257,8 +252,6 @@ class ObjectTracker {
             const parser = new NPZParser();
             const npz = await parser.parseNPZ(npzData);
             
-            console.log('NPZ parsed, keys:', Object.keys(npz));
-            
             if (npz.masks) {
                 const maskArray = npz.masks;
                 if (maskArray.shape.length === 3) {
@@ -266,14 +259,10 @@ class ObjectTracker {
                 } else if (maskArray.shape.length === 2) {
                     this.sam2Masks = [parser.numpyToMat(maskArray)];
                 }
-                
-                this.sam2Centroids = this.sam2Masks.map(mask => this.computeCentroid(mask)).filter(c => c);
-                console.log(`Loaded ${this.sam2Masks.length} masks`);
+                this.sam2Centroids = this.sam2Masks.map(m => this.computeCentroid(m)).filter(c => c);
             }
         } catch (e) {
             console.error('SAM2 load error:', e);
-            this.sam2Masks = [];
-            this.sam2Centroids = [];
         }
     }
     
@@ -281,10 +270,7 @@ class ObjectTracker {
         try {
             const moments = cv.moments(mask, false);
             if (moments.m00 === 0) return null;
-            return {
-                x: moments.m10 / moments.m00,
-                y: moments.m01 / moments.m00
-            };
+            return { x: moments.m10 / moments.m00, y: moments.m01 / moments.m00 };
         } catch (e) {
             return null;
         }
@@ -292,47 +278,28 @@ class ObjectTracker {
     
     trackSAM2(src, dst) {
         if (!this.sam2Masks || this.sam2Masks.length === 0) {
-            // Show placeholder
-            const x = Math.floor(src.cols * 0.3);
-            const y = Math.floor(src.rows * 0.3);
-            const w = Math.floor(src.cols * 0.4);
-            const h = Math.floor(src.rows * 0.4);
-            
-            cv.rectangle(dst, {x: x, y: y}, {x: x + w, y: y + h}, [255, 0, 255, 255], 2);
-            cv.putText(dst, "Load NPZ", {x: x + w/2 - 40, y: y + h/2}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [255, 0, 255, 255], 2);
-            
+            const cx = src.cols / 2;
+            const cy = src.rows / 2;
+            cv.putText(dst, "Load NPZ file", {x: cx - 60, y: cy}, cv.FONT_HERSHEY_SIMPLEX, 0.7, [255, 0, 255, 255], 2);
             return { found: false, count: 0 };
         }
         
         let count = 0;
-        
-        try {
-            for (let i = 0; i < this.sam2Masks.length; i++) {
-                const mask = this.sam2Masks[i];
-                const centroid = this.sam2Centroids[i];
-                
-                if (!mask || mask.empty()) continue;
-                
-                let scaledMask = mask;
-                if (mask.rows !== src.rows || mask.cols !== src.cols) {
-                    scaledMask = new cv.Mat();
-                    cv.resize(mask, scaledMask, new cv.Size(src.cols, src.rows));
-                }
-                
-                const rect = cv.boundingRect(scaledMask);
-                cv.rectangle(dst, {x: rect.x, y: rect.y}, {x: rect.x + rect.width, y: rect.y + rect.height}, [255, 0, 255, 255], 3);
-                
-                if (centroid) {
-                    const cx = Math.round(centroid.x * (src.cols / mask.cols));
-                    const cy = Math.round(centroid.y * (src.rows / mask.rows));
-                    cv.circle(dst, {x: cx, y: cy}, 8, [255, 0, 255, 255], -1);
-                }
-                
-                if (scaledMask !== mask) scaledMask.delete();
-                count++;
+        for (let i = 0; i < this.sam2Masks.length; i++) {
+            const mask = this.sam2Masks[i];
+            if (!mask || mask.empty()) continue;
+            
+            let scaledMask = mask;
+            if (mask.rows !== src.rows || mask.cols !== src.cols) {
+                scaledMask = new cv.Mat();
+                cv.resize(mask, scaledMask, new cv.Size(src.cols, src.rows));
             }
-        } catch (e) {
-            console.error('SAM2 tracking error:', e);
+            
+            const rect = cv.boundingRect(scaledMask);
+            this.drawDetection(dst, rect, [255, 0, 255, 255]);
+            
+            if (scaledMask !== mask) scaledMask.delete();
+            count++;
         }
         
         return { found: count > 0, count };
@@ -346,9 +313,9 @@ class ObjectTracker {
         try {
             switch (this.trackingMode) {
                 case 'marker':
-                    const markerResult = this.trackMarker(src, dst);
-                    tracked = markerResult.found;
-                    objectCount = markerResult.count;
+                    const mr = this.trackMarker(src, dst);
+                    tracked = mr.found;
+                    objectCount = mr.count;
                     break;
                     
                 case 'markerless':
@@ -357,9 +324,9 @@ class ObjectTracker {
                     break;
                     
                 case 'sam2':
-                    const sam2Result = this.trackSAM2(src, dst);
-                    tracked = sam2Result.found;
-                    objectCount = sam2Result.count;
+                    const sr = this.trackSAM2(src, dst);
+                    tracked = sr.found;
+                    objectCount = sr.count;
                     break;
             }
         } catch (e) {

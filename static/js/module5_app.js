@@ -1,4 +1,4 @@
-// Main application logic for Module 5-6 Object Tracking
+// Module 5-6: Object Tracking Application
 
 let video = null;
 let canvas = null;
@@ -18,12 +18,13 @@ function onOpenCvReady() {
     console.log('OpenCV.js is ready');
     tracker = new ObjectTracker();
     initializeUI();
+    updateStatus('Ready - Select a tracking mode and start camera');
 }
 
 // Check if OpenCV is already loaded
-if (typeof cv !== 'undefined') {
+if (typeof cv !== 'undefined' && cv.Mat) {
     onOpenCvReady();
-} else {
+} else if (typeof cv !== 'undefined') {
     cv['onRuntimeInitialized'] = onOpenCvReady;
 }
 
@@ -32,20 +33,25 @@ function initializeUI() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    const trackingMode = document.querySelectorAll('input[name="trackingMode"]');
-    trackingMode.forEach(radio => {
+    // Mode change handlers
+    document.querySelectorAll('input[name="trackingMode"]').forEach(radio => {
         radio.addEventListener('change', onModeChange);
     });
 
-    // Canvas mouse handlers for region selection
+    // Canvas mouse handlers
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
     
-    // NPZ file selection handler
-    const sam2FileInput = document.getElementById('sam2FileHidden');
-    if (sam2FileInput) {
-        sam2FileInput.addEventListener('change', function() {
+    // Touch support
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    
+    // NPZ file handler
+    const sam2Input = document.getElementById('sam2FileHidden');
+    if (sam2Input) {
+        sam2Input.addEventListener('change', function() {
             const fileName = this.files[0] ? this.files[0].name : 'No file selected';
             document.getElementById('sam2FileName').textContent = fileName;
             document.getElementById('loadSam2Btn').disabled = !this.files[0];
@@ -60,16 +66,17 @@ function onModeChange() {
     const sam2Controls = document.getElementById('sam2Controls');
     const selectRegionBtn = document.getElementById('selectRegionBtn');
 
-    if (mode === 'sam2') {
-        sam2Controls.style.display = 'block';
-        selectRegionBtn.disabled = true;
-    } else if (mode === 'markerless') {
-        sam2Controls.style.display = 'none';
-        selectRegionBtn.disabled = !isRunning; // Enable if camera running
+    sam2Controls.style.display = (mode === 'sam2') ? 'block' : 'none';
+    
+    if (mode === 'markerless') {
+        selectRegionBtn.disabled = !isRunning;
+        if (isRunning) {
+            updateStatus('Click "Select Region" to choose an object to track');
+        }
     } else {
-        // marker mode
-        sam2Controls.style.display = 'none';
         selectRegionBtn.disabled = true;
+        isSelectingRegion = false;
+        selectionRect = null;
     }
 
     updateStatus(`Mode: ${mode}`);
@@ -81,9 +88,8 @@ async function startCamera() {
     const progressText = document.getElementById('progressText');
 
     progressContainer.classList.add('active');
-    progressFill.style.width = '20%';
-    progressFill.textContent = '20%';
-    progressText.textContent = 'Starting camera...';
+    progressFill.style.width = '30%';
+    progressText.textContent = 'Requesting camera...';
 
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
@@ -95,43 +101,46 @@ async function startCamera() {
         });
 
         video.srcObject = stream;
-
-        progressFill.style.width = '50%';
-        progressFill.textContent = '50%';
-        progressText.textContent = 'Loading...';
+        progressFill.style.width = '60%';
+        progressText.textContent = 'Starting video...';
 
         await video.play();
 
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
         isRunning = true;
 
         document.getElementById('startBtn').disabled = true;
         document.getElementById('stopBtn').disabled = false;
 
         const mode = document.querySelector('input[name="trackingMode"]:checked').value;
-        if (mode === 'markerless') {
-            document.getElementById('selectRegionBtn').disabled = false;
-        }
+        document.getElementById('selectRegionBtn').disabled = (mode !== 'markerless');
 
         progressFill.style.width = '100%';
-        progressFill.textContent = '100%';
-        progressText.textContent = 'Ready! Tracking...';
+        progressText.textContent = 'Camera ready!';
+        setTimeout(() => progressContainer.classList.remove('active'), 500);
 
-        setTimeout(() => progressContainer.classList.remove('active'), 800);
+        if (mode === 'markerless') {
+            updateStatus('Click "Select Region" to choose an object');
+        } else if (mode === 'marker') {
+            updateStatus('Show a square marker to the camera');
+        } else {
+            updateStatus('Load an NPZ file for SAM2 tracking');
+        }
 
         processFrame();
 
     } catch (err) {
         console.error('Camera error:', err);
-        alert('Camera error: ' + err.message + '\n\nEnsure camera permissions are granted.');
+        alert('Camera error: ' + err.message);
         progressContainer.classList.remove('active');
     }
 }
 
 function stopCamera() {
     isRunning = false;
+    isSelectingRegion = false;
+    selectionRect = null;
 
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -145,6 +154,11 @@ function stopCamera() {
     document.getElementById('stopBtn').disabled = true;
     document.getElementById('selectRegionBtn').disabled = true;
 
+    const btn = document.getElementById('selectRegionBtn');
+    btn.textContent = 'Select Region';
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-secondary');
+
     frameCount = 0;
     fps = 0;
     updateStats();
@@ -156,80 +170,130 @@ function toggleRegionSelection() {
     const btn = document.getElementById('selectRegionBtn');
 
     if (isSelectingRegion) {
-        btn.textContent = 'Cancel Selection';
+        btn.textContent = 'Cancel';
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-danger');
-        updateStatus('Click and drag on video to select region');
+        tracker.reset(); // Clear any existing template
+        updateStatus('CLICK AND DRAG on video to select object');
     } else {
         btn.textContent = 'Select Region';
         btn.classList.remove('btn-danger');
         btn.classList.add('btn-secondary');
         selectionRect = null;
+        selectionStart = null;
         updateStatus('Selection cancelled');
     }
 }
 
+function getCanvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
 function onMouseDown(e) {
     if (!isSelectingRegion || !isRunning) return;
-
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-    selectionStart = { x, y };
+    
+    const coords = getCanvasCoords(e);
+    selectionStart = coords;
     selectionRect = null;
+    console.log('Selection started at:', coords);
 }
 
 function onMouseMove(e) {
     if (!isSelectingRegion || !selectionStart || !isRunning) return;
-
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
+    
+    const coords = getCanvasCoords(e);
     selectionRect = {
-        x: Math.min(selectionStart.x, x),
-        y: Math.min(selectionStart.y, y),
-        width: Math.abs(x - selectionStart.x),
-        height: Math.abs(y - selectionStart.y)
+        x: Math.min(selectionStart.x, coords.x),
+        y: Math.min(selectionStart.y, coords.y),
+        width: Math.abs(coords.x - selectionStart.x),
+        height: Math.abs(coords.y - selectionStart.y)
     };
 }
 
 function onMouseUp(e) {
     if (!isSelectingRegion || !selectionStart || !isRunning) return;
-
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
+    
+    const coords = getCanvasCoords(e);
     selectionRect = {
-        x: Math.min(selectionStart.x, x),
-        y: Math.min(selectionStart.y, y),
-        width: Math.abs(x - selectionStart.x),
-        height: Math.abs(y - selectionStart.y)
+        x: Math.min(selectionStart.x, coords.x),
+        y: Math.min(selectionStart.y, coords.y),
+        width: Math.abs(coords.x - selectionStart.x),
+        height: Math.abs(coords.y - selectionStart.y)
     };
+    
+    console.log('Selection ended:', selectionRect);
 
-    if (selectionRect.width > 10 && selectionRect.height > 10) {
+    if (selectionRect.width > 30 && selectionRect.height > 30) {
         captureTemplate(selectionRect);
-        isSelectingRegion = false;
-        const btn = document.getElementById('selectRegionBtn');
-        btn.textContent = 'Select Region';
-        btn.classList.remove('btn-danger');
-        btn.classList.add('btn-secondary');
-        updateStatus('Region selected. Tracking started.');
+        finishSelection(true);
     } else {
+        updateStatus('Selection too small - drag a larger area');
         selectionRect = null;
-        updateStatus('Selection too small. Try again.');
     }
-
+    
     selectionStart = null;
+}
+
+// Touch handlers
+function onTouchStart(e) {
+    onMouseDown(e);
+}
+
+function onTouchMove(e) {
+    onMouseMove(e);
+}
+
+function onTouchEnd(e) {
+    if (!isSelectingRegion || !selectionStart || !isRunning) return;
+    e.preventDefault();
+    
+    if (selectionRect && selectionRect.width > 30 && selectionRect.height > 30) {
+        captureTemplate(selectionRect);
+        finishSelection(true);
+    } else {
+        updateStatus('Selection too small');
+        selectionRect = null;
+    }
+    
+    selectionStart = null;
+}
+
+function finishSelection(success) {
+    isSelectingRegion = false;
+    selectionRect = null;
+    
+    const btn = document.getElementById('selectRegionBtn');
+    btn.textContent = 'Select Region';
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-secondary');
+    
+    if (success) {
+        updateStatus('Object selected - now tracking');
+    }
 }
 
 function captureTemplate(rect) {
     try {
+        // Create temp canvas to capture current frame
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = video.videoWidth;
         tempCanvas.height = video.videoHeight;
@@ -239,20 +303,21 @@ function captureTemplate(rect) {
         const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
         const src = cv.matFromImageData(imageData);
 
+        console.log('Capturing template from rect:', rect);
         const success = tracker.setTemplate(rect, src);
         src.delete();
         
         if (success) {
             console.log('Template captured successfully');
-            updateStatus('Template captured - tracking object');
+            updateStatus('Tracking object...');
         } else {
             console.warn('Failed to capture template');
-            updateStatus('Failed to capture template - try again');
+            updateStatus('Failed - try selecting a different area');
         }
         
         return success;
     } catch (e) {
-        console.error('Error capturing template:', e);
+        console.error('captureTemplate error:', e);
         updateStatus('Error capturing template');
         return false;
     }
@@ -276,11 +341,11 @@ async function loadSAM2File() {
         try {
             await tracker.loadSAM2Data(e.target.result);
             const maskCount = tracker.sam2Masks ? tracker.sam2Masks.length : 0;
-            updateStatus(`SAM2 file loaded: ${maskCount} mask(s) ready`);
+            updateStatus(`Loaded ${maskCount} mask(s)`);
             document.getElementById('loadSam2Btn').textContent = '✓ Loaded';
         } catch (err) {
-            console.error('Error loading SAM2 file:', err);
-            updateStatus('Error loading SAM2 file: ' + err.message);
+            console.error('SAM2 load error:', err);
+            updateStatus('Error: ' + err.message);
             document.getElementById('loadSam2Btn').disabled = false;
             document.getElementById('loadSam2Btn').textContent = 'Load Segmentation';
         }
@@ -297,8 +362,10 @@ function processFrame() {
     if (!isRunning) return;
 
     try {
+        // Draw video to canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+        // Get frame as OpenCV mat
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const src = cv.matFromImageData(imageData);
         const dst = src.clone();
@@ -306,57 +373,51 @@ function processFrame() {
         let tracked = false;
         let objectCount = 0;
 
-        // Only process tracking if NOT selecting a region
+        // Only run tracking if NOT selecting
         if (!isSelectingRegion) {
             const result = tracker.processFrame(src, dst);
             tracked = result.tracked;
             objectCount = result.objectCount;
         }
 
+        // Display result
         cv.imshow(canvas, dst);
 
+        // Draw selection rectangle if selecting
         if (isSelectingRegion && selectionRect) {
-            ctx.strokeStyle = '#FFD700';
-            ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+            ctx.strokeStyle = '#00FF00';
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
             ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]);
-            ctx.fillRect(
-                selectionRect.x,
-                selectionRect.y,
-                selectionRect.width,
-                selectionRect.height
-            );
-            ctx.strokeRect(
-                selectionRect.x,
-                selectionRect.y,
-                selectionRect.width,
-                selectionRect.height
-            );
-            ctx.setLineDash([]);
+            ctx.fillRect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height);
+            ctx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.width, selectionRect.height);
+            
+            // Draw size indicator
+            ctx.fillStyle = '#00FF00';
+            ctx.font = '14px Arial';
+            ctx.fillText(`${Math.round(selectionRect.width)} x ${Math.round(selectionRect.height)}`, 
+                         selectionRect.x + 5, selectionRect.y - 5);
         }
 
+        // Cleanup
         src.delete();
         dst.delete();
 
+        // Update stats
         frameCount++;
         updateStats(objectCount);
         updateFPS();
 
-        if (isSelectingRegion) {
-            if (selectionRect) {
-                updateStatus('Drag to adjust selection, release to confirm');
-            } else {
-                updateStatus('Click and drag on video to select region');
+        // Update status based on state
+        if (!isSelectingRegion && tracker.trackingMode === 'markerless') {
+            if (tracked) {
+                // Status updated by tracking
+            } else if (tracker.template) {
+                updateStatus('Searching for object...');
             }
-        } else if (tracked) {
-            updateStatus('Tracking: Object detected');
-        } else if (tracker.template) {
-            updateStatus('Tracking: Searching...');
-        } else {
-            updateStatus('Ready');
         }
+
     } catch (err) {
-        console.error('Processing error:', err);
+        console.error('Frame processing error:', err);
     }
 
     requestAnimationFrame(processFrame);
@@ -379,23 +440,11 @@ function updateStats(objectCount = 0) {
 }
 
 function updateStatus(message) {
-    const statusEl = document.getElementById('status');
-    statusEl.textContent = `Status: ${message}`;
+    document.getElementById('status').textContent = `Status: ${message}`;
 }
 
-function cleanupResources() {
+// Cleanup
+window.addEventListener('beforeunload', () => {
     isRunning = false;
-
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
-
-    if (video.srcObject) {
-        video.srcObject = null;
-    }
-
-    frameCount = 0;
-}
-
-window.addEventListener('beforeunload', cleanupResources);
-window.addEventListener('pagehide', cleanupResources);
+    if (stream) stream.getTracks().forEach(track => track.stop());
+});
