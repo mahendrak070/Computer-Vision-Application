@@ -492,6 +492,13 @@ def documentation():
         return render_template('login.html')
     return render_template('documentation.html')
 
+@app.route('/evaluation')
+def evaluation():
+    """SIFT Evaluation page"""
+    if 'user_id' not in session:
+        return render_template('login.html')
+    return render_template('evaluation.html')
+
 # ==================== UTILITY ROUTES ====================
 
 @app.route('/api/upload', methods=['POST'])

@@ -61,6 +61,14 @@ A production-ready web-based computer vision platform featuring real-time tracki
    - Visibility quality metrics and landmark counts
    - CSV data export for pose and hand coordinates
 
+7. **SIFT Evaluation Page**
+   - Performance analysis of OpenCV SIFT across 10 diverse image variations
+   - Test images gallery with different scenes (Indoor, Outdoor, Low Light, Pattern)
+   - Keypoints distribution bar chart visualization
+   - Detailed evaluation table with metrics and performance ratings
+   - Statistical summary (Total keypoints, Standard deviation, Variance ratio)
+   - Conclusion with key findings
+
 ---
 
 ## 🌐 Deployment
@@ -168,6 +176,7 @@ Computer-Vision-Application/
 │   ├── login.html
 │   ├── register.html
 │   ├── dashboard.html
+│   ├── evaluation.html
 │   ├── module1.html
 │   ├── module2.html
 │   ├── module3.html
@@ -175,8 +184,10 @@ Computer-Vision-Application/
 │   ├── module5.html
 │   └── module7.html
 └── static/                 # CSS and assets
-    └── css/
-        └── module.css
+    ├── css/
+    │   └── module.css
+    └── images/
+        └── eval/           # SIFT evaluation test images
 ```
 
 ---
