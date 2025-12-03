@@ -113,18 +113,84 @@ def dev_login():
     session['username'] = 'Developer'
     session.permanent = True
     return '''
-    <html>
+    <!DOCTYPE html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="refresh" content="1;url=/dashboard">
+        <title>Login Successful</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            body { font-family: Arial; text-align: center; padding: 100px; 
-                   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+                background: #0f0f0f;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+            }
+            .container {
+                text-align: center;
+                animation: fade-up 0.6s ease;
+            }
+            @keyframes fade-up {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .icon {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #e8a87c 0%, #f4a261 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 40px;
+                margin: 0 auto 24px;
+            }
+            h1 {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 12px;
+            }
+            p {
+                color: #a0a0a0;
+                font-size: 16px;
+                margin-bottom: 24px;
+            }
+            .loader {
+                width: 40px;
+                height: 40px;
+                border: 3px solid #333;
+                border-top-color: #e8a87c;
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+                margin: 0 auto 24px;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            a {
+                color: #e8a87c;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            a:hover { text-decoration: underline; }
         </style>
     </head>
     <body>
-        <h1>✅ Development Login Successful!</h1>
-        <p>Redirecting to dashboard...</p>
-        <p><a href="/dashboard" style="color: white;">Click here if not redirected</a></p>
+        <div class="container">
+            <div class="icon">✓</div>
+            <h1>Welcome, Developer!</h1>
+            <p>Redirecting to dashboard...</p>
+            <div class="loader"></div>
+            <a href="/dashboard">Click here if not redirected</a>
+        </div>
     </body>
     </html>
     '''
