@@ -49,8 +49,8 @@ class ObjectTracker {
             const hierarchy = new cv.Mat();
             cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
             
-            const minArea = (src.rows * src.cols) * 0.001;  // Min 0.1% of frame
-            const maxArea = (src.rows * src.cols) * 0.5;    // Max 50% of frame
+            const minArea = (src.rows * src.cols) * 0.002;  // Min 0.2% of frame
+            const maxArea = (src.rows * src.cols) * 0.4;    // Max 40% of frame
             
             for (let i = 0; i < contours.size(); i++) {
                 const contour = contours.get(i);
@@ -62,13 +62,13 @@ class ObjectTracker {
                     const approx = new cv.Mat();
                     cv.approxPolyDP(contour, approx, epsilon, true);
                     
-                    // Check for square-like shape (4-6 corners)
+                    // Check for square-like shape (4 corners)
                     if (approx.rows >= 4 && approx.rows <= 6) {
                         const rect = cv.boundingRect(contour);
                         const aspectRatio = rect.width / rect.height;
                         
                         // Check aspect ratio (should be roughly square)
-                        if (aspectRatio > 0.6 && aspectRatio < 1.4) {
+                        if (aspectRatio > 0.6 && aspectRatio < 1.5) {
                             // Draw detection
                             this.drawMarkerDetection(dst, rect);
                             found = true;
@@ -93,33 +93,28 @@ class ObjectTracker {
     }
     
     drawMarkerDetection(dst, rect) {
-        const green = new cv.Scalar(0, 255, 0, 255);
-        const yellow = new cv.Scalar(255, 255, 0, 255);
-        const magenta = new cv.Scalar(255, 0, 255, 255);
+        // Green bounding box
+        const pt1 = {x: rect.x, y: rect.y};
+        const pt2 = {x: rect.x + rect.width, y: rect.y + rect.height};
+        cv.rectangle(dst, pt1, pt2, [0, 255, 0, 255], 3);
         
-        // Draw bounding box
-        const pt1 = new cv.Point(rect.x, rect.y);
-        const pt2 = new cv.Point(rect.x + rect.width, rect.y + rect.height);
-        cv.rectangle(dst, pt1, pt2, green, 3);
-        
-        // Draw corners
+        // Yellow corners
         const corners = [
-            { x: rect.x, y: rect.y },
-            { x: rect.x + rect.width, y: rect.y },
-            { x: rect.x + rect.width, y: rect.y + rect.height },
-            { x: rect.x, y: rect.y + rect.height }
+            {x: rect.x, y: rect.y},
+            {x: rect.x + rect.width, y: rect.y},
+            {x: rect.x + rect.width, y: rect.y + rect.height},
+            {x: rect.x, y: rect.y + rect.height}
         ];
         corners.forEach(c => {
-            cv.circle(dst, new cv.Point(c.x, c.y), 6, yellow, -1);
+            cv.circle(dst, c, 6, [255, 255, 0, 255], -1);
         });
         
-        // Draw center with crosshair
-        const cx = rect.x + rect.width / 2;
-        const cy = rect.y + rect.height / 2;
-        const center = new cv.Point(cx, cy);
-        cv.circle(dst, center, 8, magenta, -1);
-        cv.line(dst, new cv.Point(cx - 15, cy), new cv.Point(cx + 15, cy), magenta, 2);
-        cv.line(dst, new cv.Point(cx, cy - 15), new cv.Point(cx, cy + 15), magenta, 2);
+        // Center with crosshair (magenta)
+        const cx = Math.round(rect.x + rect.width / 2);
+        const cy = Math.round(rect.y + rect.height / 2);
+        cv.circle(dst, {x: cx, y: cy}, 8, [255, 0, 255, 255], -1);
+        cv.line(dst, {x: cx - 15, y: cy}, {x: cx + 15, y: cy}, [255, 0, 255, 255], 2);
+        cv.line(dst, {x: cx, y: cy - 15}, {x: cx, y: cy + 15}, [255, 0, 255, 255], 2);
     }
     
     // ========== MARKER-LESS TRACKING (Template Matching) ==========
@@ -166,6 +161,13 @@ class ObjectTracker {
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
             cv.cvtColor(this.template, templateGray, cv.COLOR_RGBA2GRAY);
             
+            // Check template fits in source
+            if (templateGray.rows > srcGray.rows || templateGray.cols > srcGray.cols) {
+                srcGray.delete();
+                templateGray.delete();
+                return false;
+            }
+            
             // Perform template matching
             const result = new cv.Mat();
             cv.matchTemplate(srcGray, templateGray, result, cv.TM_CCOEFF_NORMED);
@@ -198,37 +200,32 @@ class ObjectTracker {
     }
     
     drawTemplateDetection(dst, x, y, w, h, confidence) {
-        const green = new cv.Scalar(0, 255, 0, 255);
-        const cyan = new cv.Scalar(0, 255, 255, 255);
-        const white = new cv.Scalar(255, 255, 255, 255);
+        // Green bounding box
+        const pt1 = {x: x, y: y};
+        const pt2 = {x: x + w, y: y + h};
+        cv.rectangle(dst, pt1, pt2, [0, 255, 0, 255], 3);
         
-        // Draw bounding box
-        const pt1 = new cv.Point(x, y);
-        const pt2 = new cv.Point(x + w, y + h);
-        cv.rectangle(dst, pt1, pt2, green, 3);
-        
-        // Draw corners
+        // Cyan corners
         const corners = [
-            { x: x, y: y },
-            { x: x + w, y: y },
-            { x: x + w, y: y + h },
-            { x: x, y: y + h }
+            {x: x, y: y},
+            {x: x + w, y: y},
+            {x: x + w, y: y + h},
+            {x: x, y: y + h}
         ];
         corners.forEach(c => {
-            cv.circle(dst, new cv.Point(c.x, c.y), 6, cyan, -1);
+            cv.circle(dst, c, 6, [0, 255, 255, 255], -1);
         });
         
-        // Draw center with crosshair
-        const cx = x + w / 2;
-        const cy = y + h / 2;
-        const center = new cv.Point(cx, cy);
-        cv.circle(dst, center, 8, white, -1);
-        cv.line(dst, new cv.Point(cx - 20, cy), new cv.Point(cx + 20, cy), green, 2);
-        cv.line(dst, new cv.Point(cx, cy - 20), new cv.Point(cx, cy + 20), green, 2);
+        // White center with green crosshair
+        const cx = Math.round(x + w / 2);
+        const cy = Math.round(y + h / 2);
+        cv.circle(dst, {x: cx, y: cy}, 8, [255, 255, 255, 255], -1);
+        cv.line(dst, {x: cx - 20, y: cy}, {x: cx + 20, y: cy}, [0, 255, 0, 255], 2);
+        cv.line(dst, {x: cx, y: cy - 20}, {x: cx, y: cy + 20}, [0, 255, 0, 255], 2);
         
-        // Draw confidence text
+        // Confidence text
         const confText = `${Math.round(confidence * 100)}%`;
-        cv.putText(dst, confText, new cv.Point(x, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.7, green, 2);
+        cv.putText(dst, confText, {x: x, y: y - 10}, cv.FONT_HERSHEY_SIMPLEX, 0.7, [0, 255, 0, 255], 2);
     }
     
     // ========== SAM2 SEGMENTATION TRACKING ==========
@@ -289,7 +286,6 @@ class ObjectTracker {
         }
         
         let count = 0;
-        const magenta = new cv.Scalar(255, 0, 255, 255);
         
         try {
             for (let i = 0; i < this.sam2Masks.length; i++) {
@@ -308,18 +304,18 @@ class ObjectTracker {
                 // Get bounding rect
                 const rect = cv.boundingRect(scaledMask);
                 
-                // Draw bounding box
-                const pt1 = new cv.Point(rect.x, rect.y);
-                const pt2 = new cv.Point(rect.x + rect.width, rect.y + rect.height);
-                cv.rectangle(dst, pt1, pt2, magenta, 3);
+                // Draw magenta bounding box
+                const pt1 = {x: rect.x, y: rect.y};
+                const pt2 = {x: rect.x + rect.width, y: rect.y + rect.height};
+                cv.rectangle(dst, pt1, pt2, [255, 0, 255, 255], 3);
                 
                 // Draw centroid
                 if (centroid) {
-                    const cx = centroid.x * (src.cols / mask.cols);
-                    const cy = centroid.y * (src.rows / mask.rows);
-                    cv.circle(dst, new cv.Point(cx, cy), 10, magenta, -1);
-                    cv.line(dst, new cv.Point(cx - 20, cy), new cv.Point(cx + 20, cy), magenta, 2);
-                    cv.line(dst, new cv.Point(cx, cy - 20), new cv.Point(cx, cy + 20), magenta, 2);
+                    const cx = Math.round(centroid.x * (src.cols / mask.cols));
+                    const cy = Math.round(centroid.y * (src.rows / mask.rows));
+                    cv.circle(dst, {x: cx, y: cy}, 10, [255, 0, 255, 255], -1);
+                    cv.line(dst, {x: cx - 20, y: cy}, {x: cx + 20, y: cy}, [255, 0, 255, 255], 2);
+                    cv.line(dst, {x: cx, y: cy - 20}, {x: cx, y: cy + 20}, [255, 0, 255, 255], 2);
                 }
                 
                 if (scaledMask !== mask) {
@@ -337,24 +333,21 @@ class ObjectTracker {
     
     trackSAM2Placeholder(src, dst) {
         // Show placeholder when no SAM2 data loaded
-        const magenta = new cv.Scalar(255, 0, 255, 255);
         const x = Math.floor(src.cols * 0.25);
         const y = Math.floor(src.rows * 0.25);
         const w = Math.floor(src.cols * 0.5);
         const h = Math.floor(src.rows * 0.5);
         
-        // Draw dashed rectangle (simulated with dots)
-        const pt1 = new cv.Point(x, y);
-        const pt2 = new cv.Point(x + w, y + h);
-        cv.rectangle(dst, pt1, pt2, magenta, 2);
+        // Dashed rectangle effect
+        const pt1 = {x: x, y: y};
+        const pt2 = {x: x + w, y: y + h};
+        cv.rectangle(dst, pt1, pt2, [255, 0, 255, 255], 2);
         
-        // Draw center
-        const cx = x + w / 2;
-        const cy = y + h / 2;
-        cv.circle(dst, new cv.Point(cx, cy), 10, magenta, -1);
-        
-        // Draw "Load NPZ" text
-        cv.putText(dst, "Load NPZ file", new cv.Point(cx - 60, cy), cv.FONT_HERSHEY_SIMPLEX, 0.6, magenta, 2);
+        // Center text
+        const cx = Math.round(x + w / 2);
+        const cy = Math.round(y + h / 2);
+        cv.circle(dst, {x: cx, y: cy}, 10, [255, 0, 255, 255], -1);
+        cv.putText(dst, "Load NPZ", {x: cx - 50, y: cy + 5}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [255, 0, 255, 255], 2);
         
         return { found: false, count: 0 };
     }
@@ -364,23 +357,27 @@ class ObjectTracker {
         let tracked = false;
         let objectCount = 0;
         
-        switch (this.trackingMode) {
-            case 'marker':
-                const markerResult = this.trackMarker(src, dst);
-                tracked = markerResult.found;
-                objectCount = markerResult.count;
-                break;
-                
-            case 'markerless':
-                tracked = this.trackMarkerless(src, dst);
-                objectCount = tracked ? 1 : 0;
-                break;
-                
-            case 'sam2':
-                const sam2Result = this.trackSAM2(src, dst);
-                tracked = sam2Result.found;
-                objectCount = sam2Result.count;
-                break;
+        try {
+            switch (this.trackingMode) {
+                case 'marker':
+                    const markerResult = this.trackMarker(src, dst);
+                    tracked = markerResult.found;
+                    objectCount = markerResult.count;
+                    break;
+                    
+                case 'markerless':
+                    tracked = this.trackMarkerless(src, dst);
+                    objectCount = tracked ? 1 : 0;
+                    break;
+                    
+                case 'sam2':
+                    const sam2Result = this.trackSAM2(src, dst);
+                    tracked = sam2Result.found;
+                    objectCount = sam2Result.count;
+                    break;
+            }
+        } catch (e) {
+            console.error('processFrame error:', e);
         }
         
         return { tracked, objectCount };
