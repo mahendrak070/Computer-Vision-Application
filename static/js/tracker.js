@@ -30,7 +30,7 @@ class ObjectTracker {
         this.sam2Centroids = [];
     }
     
-    // ========== MARKER-BASED TRACKING ==========
+    // ========== MARKER-BASED TRACKING (ArUco-like squares) ==========
     trackMarker(src, dst) {
         let found = false;
         let count = 0;
@@ -40,43 +40,55 @@ class ObjectTracker {
             const gray = new cv.Mat();
             cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
             
-            // Apply adaptive threshold to find dark markers on light background
+            // Apply binary threshold - look for high contrast markers
             const thresh = new cv.Mat();
-            cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
+            cv.threshold(gray, thresh, 100, 255, cv.THRESH_BINARY);
             
             // Find contours
             const contours = new cv.MatVector();
             const hierarchy = new cv.Mat();
-            cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+            cv.findContours(thresh, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
             
-            const minArea = (src.rows * src.cols) * 0.002;  // Min 0.2% of frame
-            const maxArea = (src.rows * src.cols) * 0.4;    // Max 40% of frame
+            // Frame dimensions for filtering
+            const frameArea = src.rows * src.cols;
+            const minArea = frameArea * 0.005;  // Min 0.5% of frame
+            const maxArea = frameArea * 0.3;    // Max 30% of frame
             
             for (let i = 0; i < contours.size(); i++) {
                 const contour = contours.get(i);
                 const area = cv.contourArea(contour);
                 
-                if (area > minArea && area < maxArea) {
-                    // Approximate to polygon
-                    const epsilon = 0.02 * cv.arcLength(contour, true);
-                    const approx = new cv.Mat();
-                    cv.approxPolyDP(contour, approx, epsilon, true);
-                    
-                    // Check for square-like shape (4 corners)
-                    if (approx.rows >= 4 && approx.rows <= 6) {
-                        const rect = cv.boundingRect(contour);
+                // Filter by area
+                if (area < minArea || area > maxArea) continue;
+                
+                // Approximate to polygon
+                const epsilon = 0.04 * cv.arcLength(contour, true);
+                const approx = new cv.Mat();
+                cv.approxPolyDP(contour, approx, epsilon, true);
+                
+                // Must be exactly 4 corners (quadrilateral)
+                if (approx.rows === 4) {
+                    // Check if convex
+                    if (cv.isContourConvex(approx)) {
+                        const rect = cv.boundingRect(approx);
                         const aspectRatio = rect.width / rect.height;
                         
-                        // Check aspect ratio (should be roughly square)
-                        if (aspectRatio > 0.6 && aspectRatio < 1.5) {
-                            // Draw detection
-                            this.drawMarkerDetection(dst, rect);
-                            found = true;
-                            count++;
+                        // Must be roughly square (aspect ratio 0.8 to 1.2)
+                        if (aspectRatio > 0.8 && aspectRatio < 1.2) {
+                            // Check fill ratio (area should match bounding rect closely)
+                            const boundingArea = rect.width * rect.height;
+                            const fillRatio = area / boundingArea;
+                            
+                            // Good markers have fill ratio > 0.8
+                            if (fillRatio > 0.75) {
+                                this.drawMarkerDetection(dst, rect);
+                                found = true;
+                                count++;
+                            }
                         }
                     }
-                    approx.delete();
                 }
+                approx.delete();
             }
             
             // Cleanup
@@ -94,9 +106,7 @@ class ObjectTracker {
     
     drawMarkerDetection(dst, rect) {
         // Green bounding box
-        const pt1 = {x: rect.x, y: rect.y};
-        const pt2 = {x: rect.x + rect.width, y: rect.y + rect.height};
-        cv.rectangle(dst, pt1, pt2, [0, 255, 0, 255], 3);
+        cv.rectangle(dst, {x: rect.x, y: rect.y}, {x: rect.x + rect.width, y: rect.y + rect.height}, [0, 255, 0, 255], 3);
         
         // Yellow corners
         const corners = [
@@ -106,15 +116,13 @@ class ObjectTracker {
             {x: rect.x, y: rect.y + rect.height}
         ];
         corners.forEach(c => {
-            cv.circle(dst, c, 6, [255, 255, 0, 255], -1);
+            cv.circle(dst, c, 5, [255, 255, 0, 255], -1);
         });
         
-        // Center with crosshair (magenta)
+        // Center point (magenta)
         const cx = Math.round(rect.x + rect.width / 2);
         const cy = Math.round(rect.y + rect.height / 2);
-        cv.circle(dst, {x: cx, y: cy}, 8, [255, 0, 255, 255], -1);
-        cv.line(dst, {x: cx - 15, y: cy}, {x: cx + 15, y: cy}, [255, 0, 255, 255], 2);
-        cv.line(dst, {x: cx, y: cy - 15}, {x: cx, y: cy + 15}, [255, 0, 255, 255], 2);
+        cv.circle(dst, {x: cx, y: cy}, 6, [255, 0, 255, 255], -1);
     }
     
     // ========== MARKER-LESS TRACKING (Template Matching) ==========
@@ -123,37 +131,53 @@ class ObjectTracker {
             // Cleanup old template
             if (this.template) {
                 try { this.template.delete(); } catch(e) {}
+                this.template = null;
             }
             
-            // Clamp coordinates
+            // Validate and clamp coordinates
             const x = Math.max(0, Math.floor(rect.x));
             const y = Math.max(0, Math.floor(rect.y));
-            const w = Math.min(Math.floor(rect.width), frame.cols - x);
-            const h = Math.min(Math.floor(rect.height), frame.rows - y);
+            let w = Math.floor(rect.width);
+            let h = Math.floor(rect.height);
             
-            if (w < 10 || h < 10) {
-                console.warn('Template too small');
-                return;
+            // Ensure within frame bounds
+            if (x + w > frame.cols) w = frame.cols - x;
+            if (y + h > frame.rows) h = frame.rows - y;
+            
+            if (w < 20 || h < 20) {
+                console.warn('Template too small:', w, 'x', h);
+                return false;
             }
             
             // Extract template region
-            const templateRect = new cv.Rect(x, y, w, h);
-            this.template = frame.roi(templateRect).clone();
+            const roiRect = new cv.Rect(x, y, w, h);
+            const roi = frame.roi(roiRect);
+            this.template = roi.clone();
+            roi.delete();
+            
             this.templateRect = { x, y, width: w, height: h };
             
-            console.log(`Template set: ${w}x${h} at (${x}, ${y})`);
+            console.log(`Template captured: ${w}x${h} at (${x}, ${y})`);
+            return true;
         } catch (e) {
             console.error('Error setting template:', e);
             this.template = null;
+            return false;
         }
     }
     
     trackMarkerless(src, dst) {
-        if (!this.template || this.template.empty()) {
+        if (!this.template) {
             return false;
         }
         
         try {
+            // Check if template is valid
+            if (this.template.empty()) {
+                console.warn('Template is empty');
+                return false;
+            }
+            
             // Convert both to grayscale
             const srcGray = new cv.Mat();
             const templateGray = new cv.Mat();
@@ -161,8 +185,9 @@ class ObjectTracker {
             cv.cvtColor(src, srcGray, cv.COLOR_RGBA2GRAY);
             cv.cvtColor(this.template, templateGray, cv.COLOR_RGBA2GRAY);
             
-            // Check template fits in source
+            // Validate sizes
             if (templateGray.rows > srcGray.rows || templateGray.cols > srcGray.cols) {
+                console.warn('Template larger than source');
                 srcGray.delete();
                 templateGray.delete();
                 return false;
@@ -177,17 +202,15 @@ class ObjectTracker {
             const confidence = minMax.maxVal;
             const maxLoc = minMax.maxLoc;
             
-            // Cleanup intermediate mats
+            // Cleanup
             srcGray.delete();
             templateGray.delete();
             result.delete();
             
-            // Threshold for valid detection
+            // Only show if confidence > 0.5
             if (confidence > 0.5) {
                 const w = this.template.cols;
                 const h = this.template.rows;
-                
-                // Draw detection
                 this.drawTemplateDetection(dst, maxLoc.x, maxLoc.y, w, h, confidence);
                 return true;
             }
@@ -201,9 +224,7 @@ class ObjectTracker {
     
     drawTemplateDetection(dst, x, y, w, h, confidence) {
         // Green bounding box
-        const pt1 = {x: x, y: y};
-        const pt2 = {x: x + w, y: y + h};
-        cv.rectangle(dst, pt1, pt2, [0, 255, 0, 255], 3);
+        cv.rectangle(dst, {x: x, y: y}, {x: x + w, y: y + h}, [0, 255, 0, 255], 3);
         
         // Cyan corners
         const corners = [
@@ -213,19 +234,17 @@ class ObjectTracker {
             {x: x, y: y + h}
         ];
         corners.forEach(c => {
-            cv.circle(dst, c, 6, [0, 255, 255, 255], -1);
+            cv.circle(dst, c, 5, [0, 255, 255, 255], -1);
         });
         
-        // White center with green crosshair
+        // White center
         const cx = Math.round(x + w / 2);
         const cy = Math.round(y + h / 2);
-        cv.circle(dst, {x: cx, y: cy}, 8, [255, 255, 255, 255], -1);
-        cv.line(dst, {x: cx - 20, y: cy}, {x: cx + 20, y: cy}, [0, 255, 0, 255], 2);
-        cv.line(dst, {x: cx, y: cy - 20}, {x: cx, y: cy + 20}, [0, 255, 0, 255], 2);
+        cv.circle(dst, {x: cx, y: cy}, 6, [255, 255, 255, 255], -1);
         
-        // Confidence text
+        // Confidence label
         const confText = `${Math.round(confidence * 100)}%`;
-        cv.putText(dst, confText, {x: x, y: y - 10}, cv.FONT_HERSHEY_SIMPLEX, 0.7, [0, 255, 0, 255], 2);
+        cv.putText(dst, confText, {x: x, y: y - 10}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [0, 255, 0, 255], 2);
     }
     
     // ========== SAM2 SEGMENTATION TRACKING ==========
@@ -235,29 +254,21 @@ class ObjectTracker {
             this.sam2Masks = [];
             this.sam2Centroids = [];
             
-            // Parse NPZ file
             const parser = new NPZParser();
             const npz = await parser.parseNPZ(npzData);
             
             console.log('NPZ parsed, keys:', Object.keys(npz));
             
-            // Extract masks
             if (npz.masks) {
                 const maskArray = npz.masks;
-                console.log('Masks shape:', maskArray.shape);
-                
                 if (maskArray.shape.length === 3) {
-                    // Multiple masks (N, H, W)
                     this.sam2Masks = parser.numpyToMat(maskArray);
                 } else if (maskArray.shape.length === 2) {
-                    // Single mask (H, W)
                     this.sam2Masks = [parser.numpyToMat(maskArray)];
                 }
                 
-                // Compute centroids
                 this.sam2Centroids = this.sam2Masks.map(mask => this.computeCentroid(mask)).filter(c => c);
-                
-                console.log(`Loaded ${this.sam2Masks.length} masks, ${this.sam2Centroids.length} centroids`);
+                console.log(`Loaded ${this.sam2Masks.length} masks`);
             }
         } catch (e) {
             console.error('SAM2 load error:', e);
@@ -281,8 +292,16 @@ class ObjectTracker {
     
     trackSAM2(src, dst) {
         if (!this.sam2Masks || this.sam2Masks.length === 0) {
-            // Show placeholder if no masks loaded
-            return this.trackSAM2Placeholder(src, dst);
+            // Show placeholder
+            const x = Math.floor(src.cols * 0.3);
+            const y = Math.floor(src.rows * 0.3);
+            const w = Math.floor(src.cols * 0.4);
+            const h = Math.floor(src.rows * 0.4);
+            
+            cv.rectangle(dst, {x: x, y: y}, {x: x + w, y: y + h}, [255, 0, 255, 255], 2);
+            cv.putText(dst, "Load NPZ", {x: x + w/2 - 40, y: y + h/2}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [255, 0, 255, 255], 2);
+            
+            return { found: false, count: 0 };
         }
         
         let count = 0;
@@ -294,34 +313,22 @@ class ObjectTracker {
                 
                 if (!mask || mask.empty()) continue;
                 
-                // Scale mask if needed
                 let scaledMask = mask;
                 if (mask.rows !== src.rows || mask.cols !== src.cols) {
                     scaledMask = new cv.Mat();
                     cv.resize(mask, scaledMask, new cv.Size(src.cols, src.rows));
                 }
                 
-                // Get bounding rect
                 const rect = cv.boundingRect(scaledMask);
+                cv.rectangle(dst, {x: rect.x, y: rect.y}, {x: rect.x + rect.width, y: rect.y + rect.height}, [255, 0, 255, 255], 3);
                 
-                // Draw magenta bounding box
-                const pt1 = {x: rect.x, y: rect.y};
-                const pt2 = {x: rect.x + rect.width, y: rect.y + rect.height};
-                cv.rectangle(dst, pt1, pt2, [255, 0, 255, 255], 3);
-                
-                // Draw centroid
                 if (centroid) {
                     const cx = Math.round(centroid.x * (src.cols / mask.cols));
                     const cy = Math.round(centroid.y * (src.rows / mask.rows));
-                    cv.circle(dst, {x: cx, y: cy}, 10, [255, 0, 255, 255], -1);
-                    cv.line(dst, {x: cx - 20, y: cy}, {x: cx + 20, y: cy}, [255, 0, 255, 255], 2);
-                    cv.line(dst, {x: cx, y: cy - 20}, {x: cx, y: cy + 20}, [255, 0, 255, 255], 2);
+                    cv.circle(dst, {x: cx, y: cy}, 8, [255, 0, 255, 255], -1);
                 }
                 
-                if (scaledMask !== mask) {
-                    scaledMask.delete();
-                }
-                
+                if (scaledMask !== mask) scaledMask.delete();
                 count++;
             }
         } catch (e) {
@@ -329,27 +336,6 @@ class ObjectTracker {
         }
         
         return { found: count > 0, count };
-    }
-    
-    trackSAM2Placeholder(src, dst) {
-        // Show placeholder when no SAM2 data loaded
-        const x = Math.floor(src.cols * 0.25);
-        const y = Math.floor(src.rows * 0.25);
-        const w = Math.floor(src.cols * 0.5);
-        const h = Math.floor(src.rows * 0.5);
-        
-        // Dashed rectangle effect
-        const pt1 = {x: x, y: y};
-        const pt2 = {x: x + w, y: y + h};
-        cv.rectangle(dst, pt1, pt2, [255, 0, 255, 255], 2);
-        
-        // Center text
-        const cx = Math.round(x + w / 2);
-        const cy = Math.round(y + h / 2);
-        cv.circle(dst, {x: cx, y: cy}, 10, [255, 0, 255, 255], -1);
-        cv.putText(dst, "Load NPZ", {x: cx - 50, y: cy + 5}, cv.FONT_HERSHEY_SIMPLEX, 0.6, [255, 0, 255, 255], 2);
-        
-        return { found: false, count: 0 };
     }
     
     // ========== MAIN PROCESSING ==========

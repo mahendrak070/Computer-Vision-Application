@@ -63,14 +63,16 @@ function onModeChange() {
     if (mode === 'sam2') {
         sam2Controls.style.display = 'block';
         selectRegionBtn.disabled = true;
-    } else {
+    } else if (mode === 'markerless') {
         sam2Controls.style.display = 'none';
-        if (isRunning) {
-            selectRegionBtn.disabled = (mode !== 'markerless');
-        }
+        selectRegionBtn.disabled = !isRunning; // Enable if camera running
+    } else {
+        // marker mode
+        sam2Controls.style.display = 'none';
+        selectRegionBtn.disabled = true;
     }
 
-    updateStatus(`Mode changed to: ${mode}`);
+    updateStatus(`Mode: ${mode}`);
 }
 
 async function startCamera() {
@@ -227,18 +229,33 @@ function onMouseUp(e) {
 }
 
 function captureTemplate(rect) {
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = video.videoWidth;
-    tempCanvas.height = video.videoHeight;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.drawImage(video, 0, 0);
+    try {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0);
 
-    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-    const src = cv.matFromImageData(imageData);
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const src = cv.matFromImageData(imageData);
 
-    tracker.setTemplate(rect, src);
-
-    src.delete();
+        const success = tracker.setTemplate(rect, src);
+        src.delete();
+        
+        if (success) {
+            console.log('Template captured successfully');
+            updateStatus('Template captured - tracking object');
+        } else {
+            console.warn('Failed to capture template');
+            updateStatus('Failed to capture template - try again');
+        }
+        
+        return success;
+    } catch (e) {
+        console.error('Error capturing template:', e);
+        updateStatus('Error capturing template');
+        return false;
+    }
 }
 
 async function loadSAM2File() {
@@ -289,7 +306,8 @@ function processFrame() {
         let tracked = false;
         let objectCount = 0;
 
-        if (!isSelectingRegion || tracker.template) {
+        // Only process tracking if NOT selecting a region
+        if (!isSelectingRegion) {
             const result = tracker.processFrame(src, dst);
             tracked = result.tracked;
             objectCount = result.objectCount;
