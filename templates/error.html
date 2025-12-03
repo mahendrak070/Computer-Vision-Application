@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ error_code }} - {{ error_title }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,119 +14,118 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-card: #242424;
+            --accent-primary: #e8a87c;
+            --accent-tertiary: #f4a261;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --border-color: #333333;
+            --error: #e85d5d;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #ffffff;
-            padding: 20px;
+            color: var(--text-primary);
+            padding: 24px;
         }
 
         .error-container {
-            background: rgba(26, 26, 46, 0.7);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 247, 255, 0.2);
-            border-radius: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
             padding: 60px 48px;
-            max-width: 600px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 247, 255, 0.1);
+            animation: fade-up 0.6s ease;
+        }
+
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .error-code {
-            font-size: 120px;
+            font-size: 100px;
             font-weight: 700;
-            background: linear-gradient(135deg, #ff5252 0%, #ff1744 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--error);
             line-height: 1;
-            margin-bottom: 24px;
-        }
-
-        .error-title {
-            font-size: 36px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #00f7ff 0%, #0084ff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
             margin-bottom: 16px;
         }
 
+        .error-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
         .error-message {
-            color: #8892b0;
-            font-size: 18px;
-            margin-bottom: 40px;
+            color: var(--text-secondary);
+            font-size: 16px;
+            margin-bottom: 36px;
             line-height: 1.6;
         }
 
         .error-actions {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             justify-content: center;
             flex-wrap: wrap;
         }
 
         .btn {
-            padding: 14px 32px;
-            font-size: 16px;
+            padding: 14px 28px;
+            font-size: 15px;
             font-weight: 600;
+            font-family: inherit;
             border: none;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             text-decoration: none;
             display: inline-block;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #00f7ff 0%, #0084ff 100%);
-            color: #0a0a1a;
-            box-shadow: 0 4px 16px rgba(0, 247, 255, 0.3);
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-tertiary) 100%);
+            color: var(--bg-primary);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0, 247, 255, 0.5);
+            box-shadow: 0 8px 24px rgba(232, 168, 124, 0.3);
         }
 
         .btn-secondary {
-            background: rgba(100, 255, 218, 0.1);
-            color: #64ffda;
-            border: 1px solid #64ffda;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
         }
 
         .btn-secondary:hover {
-            background: rgba(100, 255, 218, 0.2);
-        }
-
-        .error-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-            display: inline-block;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
+            background: #2a2a2a;
+            color: var(--text-primary);
         }
 
         .help-text {
             margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid rgba(100, 255, 218, 0.2);
-            color: #8892b0;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
             font-size: 14px;
         }
 
         .help-text a {
-            color: #00f7ff;
+            color: var(--accent-primary);
             text-decoration: none;
         }
 
@@ -134,30 +136,18 @@
 </head>
 <body>
     <div class="error-container">
-        <div class="error-icon">⚠️</div>
         <div class="error-code">{{ error_code }}</div>
         <h1 class="error-title">{{ error_title }}</h1>
         <p class="error-message">{{ error_message }}</p>
         
         <div class="error-actions">
             <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
-            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+            <a href="/dashboard" class="btn btn-primary">Dashboard</a>
         </div>
         
         <div class="help-text">
             Need help? <a href="/">Return to Home</a> or <a href="/login">Log in again</a>
         </div>
     </div>
-
-    <script>
-        setTimeout(() => {
-            if (document.referrer && {{ error_code }} === 401) {
-                console.log('Session expired. Redirecting to login...');
-            }
-        }, 3000);
-    </script>
 </body>
 </html>
-
-
-

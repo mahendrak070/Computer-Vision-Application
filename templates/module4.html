@@ -5,11 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Module 4 - Image Stitching</title>
     <link rel="stylesheet" href="/static/css/module.css">
+    <style>
+        .image-preview {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .image-preview img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+        .image-preview .number {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
-        <h1>Module 4: Image Stitching & SIFT</h1>
-        <a href="/dashboard" class="back-btn">Back to Dashboard</a>
+        <h1>Module 4: Image Stitching</h1>
+        <a href="/dashboard" class="back-btn">← Back</a>
     </div>
 
     <div class="container">
@@ -38,7 +61,7 @@
 
             <div class="progress-container" id="stitchProgress">
                 <div class="progress-bar">
-                    <div class="progress-fill" id="stitchProgressFill">0%</div>
+                    <div class="progress-fill" id="stitchProgressFill" style="width: 0%"></div>
                 </div>
                 <div class="progress-text" id="stitchProgressText">Processing...</div>
             </div>
@@ -49,7 +72,7 @@
                 <div class="result-card">
                     <h4>Stitched Panorama</h4>
                     <img id="panorama" style="width: 100%;" alt="Panorama">
-                    <button class="btn-secondary" onclick="downloadImage(document.getElementById('panorama').src, 'panorama.jpg')">Download</button>
+                    <button class="btn-secondary" style="margin-top: 12px;" onclick="downloadImage(document.getElementById('panorama').src, 'panorama.jpg')">Download</button>
                 </div>
             </div>
         </div>
@@ -69,7 +92,7 @@
 
             <div class="progress-container" id="siftProgress">
                 <div class="progress-bar">
-                    <div class="progress-fill" id="siftProgressFill">0%</div>
+                    <div class="progress-fill" id="siftProgressFill" style="width: 0%"></div>
                 </div>
                 <div class="progress-text" id="siftProgressText">Processing...</div>
             </div>
@@ -94,11 +117,10 @@
                 reader.onload = function(e) {
                     stitchImages_data.push(e.target.result);
                     const div = document.createElement('div');
+                    div.className = 'image-preview';
                     div.innerHTML = `
-                        <div style="position: relative;">
-                            <div style="position: absolute; top: 8px; left: 8px; background: rgba(0, 247, 255, 0.9); color: #0a0a1a; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">${index + 1}</div>
-                            <img src="${e.target.result}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid rgba(0, 247, 255, 0.3);">
-                        </div>
+                        <span class="number">${index + 1}</span>
+                        <img src="${e.target.result}" alt="Image ${index + 1}">
                     `;
                     preview.appendChild(div);
 
@@ -133,14 +155,10 @@
             spinner.classList.add('active');
             
             progressFill.style.width = '20%';
-            progressFill.textContent = '20%';
             progressText.textContent = 'Uploading images...';
 
             try {
-                console.log(`[Module 4] Stitching ${stitchImages_data.length} images`);
-                
                 progressFill.style.width = '30%';
-                progressFill.textContent = '30%';
                 progressText.textContent = 'Detecting features...';
 
                 const controller = new AbortController();
@@ -159,20 +177,17 @@
                 clearTimeout(timeoutId);
                 
                 progressFill.style.width = '70%';
-                progressFill.textContent = '70%';
                 progressText.textContent = 'Stitching panorama...';
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log('[Module 4] Response:', data);
 
                 if (data.success) {
                     progressFill.style.width = '100%';
-                    progressFill.textContent = '100%';
                     progressText.textContent = 'Complete!';
                     
                     document.getElementById('panorama').src = data.stitched;
@@ -183,17 +198,11 @@
                     throw new Error(data.message || 'Stitching failed');
                 }
             } catch (err) {
-                console.error('[Module 4] Error:', err);
-                
                 if (err.name === 'AbortError') {
-                    alert('Stitching timeout (2min). Try using smaller images or fewer images.');
-                } else if (err.message.includes('Not authenticated')) {
-                    alert('Session expired. Please log in again.');
-                    setTimeout(() => window.location.href = '/login', 1000);
+                    alert('Stitching timeout. Try using smaller images.');
                 } else {
                     alert('Stitching Error: ' + err.message);
                 }
-                
                 progressContainer.classList.remove('active');
             } finally {
                 spinner.classList.remove('active');
@@ -225,28 +234,22 @@
             spinner.classList.add('active');
             
             progressFill.style.width = '40%';
-            progressFill.textContent = '40%';
             progressText.textContent = 'Detecting keypoints...';
 
             try {
                 const response = await fetch('/api/module4/sift_detect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image: siftImage,
-                        use_custom: useCustom
-                    })
+                    body: JSON.stringify({ image: siftImage, use_custom: useCustom })
                 });
                 
                 progressFill.style.width = '80%';
-                progressFill.textContent = '80%';
                 progressText.textContent = 'Computing descriptors...';
                 
                 const data = await response.json();
 
                 if (data.success) {
                     progressFill.style.width = '100%';
-                    progressFill.textContent = '100%';
                     progressText.textContent = 'Complete!';
                     
                     document.getElementById('siftResults').innerHTML = `
@@ -256,8 +259,8 @@
                                 <span class="stat-label">Keypoints Detected:</span>
                                 <span class="stat-value">${data.num_keypoints}</span>
                             </div>
-                            <img src="${data.image}" style="width: 100%;">
-                            <button class="btn-secondary" onclick="downloadImage('${data.image}', 'sift_features.jpg')">Download</button>
+                            <img src="${data.image}" style="width: 100%; margin-top: 12px;">
+                            <button class="btn-secondary" style="margin-top: 12px;" onclick="downloadImage('${data.image}', 'sift_features.jpg')">Download</button>
                         </div>
                     `;
                     
@@ -277,11 +280,6 @@
             link.download = filename;
             link.click();
         }
-
-        window.addEventListener('beforeunload', () => {
-            stitchImages_data = [];
-            siftImage = null;
-        });
     </script>
 </body>
 </html>

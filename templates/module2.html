@@ -13,25 +13,25 @@
             margin-top: 20px;
         }
         .result-panel {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(0, 247, 255, 0.2);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 16px;
         }
         .result-panel h4 {
             margin: 0 0 12px 0;
-            color: #00f7ff;
+            color: var(--text-primary);
             font-size: 14px;
         }
         .result-panel img {
             width: 100%;
             border-radius: 8px;
-            border: 1px solid rgba(0, 247, 255, 0.2);
+            border: 1px solid var(--border-color);
         }
         .detection-badge {
             display: inline-block;
-            background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
+            background: rgba(133, 220, 184, 0.15);
+            color: var(--accent-secondary);
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
@@ -42,107 +42,78 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .param-row label {
             min-width: 100px;
             font-size: 13px;
+            color: var(--text-secondary);
         }
         .param-row input[type="range"] {
             flex: 1;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--border-color);
+            border-radius: 3px;
+            border: none;
+        }
+        .param-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
         }
         .param-row .value {
             min-width: 50px;
             text-align: right;
-            color: #00f7ff;
+            color: var(--accent-primary);
             font-weight: 600;
-        }
-        .toggle-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 26px;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(0, 247, 255, 0.3);
-            transition: 0.3s;
-            border-radius: 26px;
-        }
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 4px;
-            bottom: 3px;
-            background-color: #8892b0;
-            transition: 0.3s;
-            border-radius: 50%;
-        }
-        input:checked + .toggle-slider {
-            background-color: rgba(0, 247, 255, 0.2);
-            border-color: #00f7ff;
-        }
-        input:checked + .toggle-slider:before {
-            transform: translateX(24px);
-            background-color: #00f7ff;
+            font-family: monospace;
         }
         .template-preview {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            margin-bottom: 8px;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 10px;
         }
         .template-preview img {
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             object-fit: cover;
-            border-radius: 6px;
-            border: 1px solid rgba(0, 247, 255, 0.3);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
         }
         .template-preview .info {
             flex: 1;
         }
         .template-preview .name {
             font-weight: 600;
-            color: #ccd6f6;
-            font-size: 13px;
+            color: var(--text-primary);
+            font-size: 14px;
         }
         .template-preview .size {
-            font-size: 11px;
-            color: #8892b0;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
         .template-preview .remove-btn {
-            background: rgba(255, 100, 100, 0.2);
-            border: 1px solid rgba(255, 100, 100, 0.5);
-            color: #ff6b6b;
-            padding: 6px 12px;
-            border-radius: 6px;
+            background: rgba(232, 93, 93, 0.1);
+            border: 1px solid rgba(232, 93, 93, 0.3);
+            color: var(--error);
+            padding: 8px 14px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
+            transition: all 0.2s;
         }
         .template-preview .remove-btn:hover {
-            background: rgba(255, 100, 100, 0.4);
+            background: rgba(232, 93, 93, 0.2);
         }
         @media (max-width: 768px) {
             .results-container {
@@ -154,7 +125,7 @@
 <body>
     <div class="header">
         <h1>Module 2: Template Matching</h1>
-        <a href="/dashboard" class="back-btn">Back to Dashboard</a>
+        <a href="/dashboard" class="back-btn">← Back</a>
     </div>
 
     <div class="container">
@@ -168,17 +139,15 @@
                 <h2>Template Matching</h2>
                 <div class="info-box">
                     <strong>How it works:</strong> Upload a template image and a scene image. 
-                    The system uses <code>cv.matchTemplate()</code> with <strong>TM_CCOEFF_NORMED</strong> 
-                    (normalized cross-correlation) to find the template in the scene.
+                    The system uses normalized cross-correlation to find the template in the scene.
                     <br><br>
                     <strong>Output:</strong> White rectangle around detected object with confidence score.
                 </div>
 
                 <div class="grid">
-                    <!-- Left Column: Templates -->
                     <div>
                         <h3>Template Image</h3>
-                        <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)" style="display:none">
+                        <input type="file" id="templateInput" accept="image/*" multiple onchange="loadTemplates(event)">
                         <div class="controls">
                             <button class="btn-primary" onclick="document.getElementById('templateInput').click()">+ Add Template</button>
                             <button class="btn-danger" onclick="clearTemplates()">Clear</button>
@@ -192,39 +161,36 @@
                         <div id="templateList" style="margin-top: 16px; max-height: 300px; overflow-y: auto;"></div>
                     </div>
 
-                    <!-- Right Column: Scene -->
                     <div>
                         <h3>Scene Image</h3>
-                        <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)" style="display:none">
+                        <input type="file" id="sceneInput" accept="image/*" onchange="loadScene(event)">
                         <div class="controls">
                             <button class="btn-primary" onclick="document.getElementById('sceneInput').click()">Upload Scene</button>
                         </div>
-                        <canvas id="sceneCanvas" style="width: 100%; max-width: 500px; margin-top: 16px; border-radius: 8px; border: 1px solid rgba(0, 247, 255, 0.2);"></canvas>
+                        <canvas id="sceneCanvas" style="width: 100%; max-width: 500px; margin-top: 16px;"></canvas>
                     </div>
                 </div>
 
-                <!-- Configuration -->
                 <div class="stats" style="margin-top: 24px;">
-                    <h3>⚙️ Settings</h3>
+                    <h3>Settings</h3>
                     
                     <div class="param-row">
                         <label>Threshold:</label>
                         <input type="range" id="threshold" min="0.5" max="0.99" step="0.01" value="0.8" oninput="updateThreshold()">
                         <span class="value" id="thresholdValue">0.80</span>
                     </div>
-                    <p style="font-size: 12px; color: #8892b0; margin-top: 4px;">
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
                         Higher threshold = stricter matching. Lower it if no match is found.
                     </p>
-                    
                 </div>
 
-                <button id="matchBtn" class="btn-primary" onclick="matchTemplates()" disabled style="width: 100%; margin-top: 24px; padding: 16px; font-size: 16px;">
-                    🔍 Find Template in Scene
+                <button id="matchBtn" class="btn-primary" onclick="matchTemplates()" disabled style="width: 100%; margin-top: 24px; padding: 16px; font-size: 15px;">
+                    Find Template in Scene
                 </button>
 
                 <div class="progress-container" id="matchProgress">
                     <div class="progress-bar">
-                        <div class="progress-fill" id="matchProgressFill">0%</div>
+                        <div class="progress-fill" id="matchProgressFill" style="width: 0%"></div>
                     </div>
                     <div class="progress-text" id="matchProgressText">Processing...</div>
                 </div>
@@ -236,12 +202,12 @@
 
         <div id="fourierTab" class="tab-content" style="display:none;">
             <div class="section">
-                <h2>🔬 Fourier Restoration</h2>
+                <h2>Fourier Restoration</h2>
                 <div class="info-box">
                     <strong>Process:</strong> Apply Gaussian blur to an image and restore it using frequency domain filtering.
                 </div>
 
-                <input type="file" id="fourierInput" accept="image/*" onchange="loadFourierImage(event)" style="display:none">
+                <input type="file" id="fourierInput" accept="image/*" onchange="loadFourierImage(event)">
                 <div class="controls">
                     <button class="btn-primary" onclick="document.getElementById('fourierInput').click()">Upload Image</button>
                     <button class="btn-danger" onclick="clearFourier()">Clear</button>
@@ -259,9 +225,9 @@
                         <input type="range" id="sigma" min="1" max="10" step="0.5" value="3" oninput="updateLabels()">
                         <span class="value" id="sigmaLabel">3.0</span>
                     </div>
-                    <div>
+                    <div style="margin-top: 16px;">
                         <label>Method:</label>
-                        <select id="method" style="width: 100%; padding: 10px; margin-top: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 247, 255, 0.3); color: #ccd6f6; border-radius: 8px;">
+                        <select id="method">
                             <option value="wiener">Wiener Filter</option>
                             <option value="richardson_lucy">Richardson-Lucy</option>
                         </select>
@@ -269,12 +235,12 @@
                 </div>
 
                 <button id="fourierBtn" class="btn-primary" onclick="processBlurRestore()" disabled style="width: 100%;">
-                    ⚡ Blur & Restore
+                    Blur & Restore
                 </button>
 
                 <div class="progress-container" id="fourierProgress">
                     <div class="progress-bar">
-                        <div class="progress-fill" id="fourierProgressFill">0%</div>
+                        <div class="progress-fill" id="fourierProgressFill" style="width: 0%"></div>
                     </div>
                     <div class="progress-text" id="fourierProgressText">Processing...</div>
                 </div>
@@ -428,7 +394,6 @@
             spinner.classList.add('active');
             
             progressFill.style.width = '20%';
-            progressFill.textContent = '20%';
             progressText.textContent = 'Matching template...';
 
             try {
@@ -444,14 +409,12 @@
                 });
                 
                 progressFill.style.width = '80%';
-                progressFill.textContent = '80%';
                 progressText.textContent = 'Drawing results...';
                 
                 const data = await response.json();
 
                 if (data.success) {
                     progressFill.style.width = '100%';
-                    progressFill.textContent = '100%';
                     progressText.textContent = 'Done!';
                     
                     displayMatchResults(data.matches);
@@ -484,17 +447,17 @@
                 const confidence = det ? (det.confidence * 100).toFixed(1) : 0;
                 
                 html += `
-                    <div style="margin-top: 24px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid rgba(0, 247, 255, 0.2);">
-                        <h4 style="margin: 0 0 16px 0; color: #ccd6f6;">
+                    <div style="margin-top: 24px; padding: 24px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
+                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 16px;">
                             ${m.name}
                             <span class="detection-badge">${confidence}% confidence</span>
                         </h4>
                         
-                        <img src="${m.result_image}" alt="Result" style="width: 100%; border-radius: 8px; border: 1px solid rgba(0, 247, 255, 0.2);">
+                        <img src="${m.result_image}" alt="Result" style="width: 100%; border-radius: 8px; border: 1px solid var(--border-color);">
                         
                         <div style="margin-top: 16px;">
                             <button class="btn-secondary" onclick="downloadImage('${m.result_image}', '${m.name}_result.jpg')">
-                                📥 Download Result
+                                Download Result
                             </button>
                         </div>
                     </div>
@@ -504,7 +467,6 @@
             resultsDiv.innerHTML = html;
         }
 
-        // Fourier Functions
         function loadFourierImage(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -545,7 +507,6 @@
             spinner.classList.add('active');
             
             progressFill.style.width = '30%';
-            progressFill.textContent = '30%';
             progressText.textContent = 'Applying blur...';
 
             try {
@@ -556,14 +517,12 @@
                 });
                 
                 progressFill.style.width = '70%';
-                progressFill.textContent = '70%';
                 progressText.textContent = 'Restoring...';
                 
                 const data = await response.json();
 
                 if (data.success) {
                     progressFill.style.width = '100%';
-                    progressFill.textContent = '100%';
                     progressText.textContent = 'Done!';
                     
                     displayFourierResults(data);
@@ -585,17 +544,17 @@
                 <div class="result-card">
                     <h4>Original</h4>
                     <img src="${data.original}" alt="Original">
-                    <button class="btn-secondary" onclick="downloadImage('${data.original}', 'original.jpg')">Download</button>
+                    <button class="btn-secondary" style="margin-top: 12px;" onclick="downloadImage('${data.original}', 'original.jpg')">Download</button>
                 </div>
                 <div class="result-card">
                     <h4>Blurred (${data.kernel_size}px, σ=${data.sigma})</h4>
                     <img src="${data.blurred}" alt="Blurred">
-                    <button class="btn-secondary" onclick="downloadImage('${data.blurred}', 'blurred.jpg')">Download</button>
+                    <button class="btn-secondary" style="margin-top: 12px;" onclick="downloadImage('${data.blurred}', 'blurred.jpg')">Download</button>
                 </div>
                 <div class="result-card">
                     <h4>Restored (${data.method === 'wiener' ? 'Wiener' : 'RL'})</h4>
                     <img src="${data.restored}" alt="Restored">
-                    <button class="btn-secondary" onclick="downloadImage('${data.restored}', 'restored.jpg')">Download</button>
+                    <button class="btn-secondary" style="margin-top: 12px;" onclick="downloadImage('${data.restored}', 'restored.jpg')">Download</button>
                 </div>
             `;
         }
@@ -613,4 +572,3 @@
     </script>
 </body>
 </html>
-

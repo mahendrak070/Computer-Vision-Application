@@ -5,11 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Module 3 - Feature Detection</title>
     <link rel="stylesheet" href="/static/css/module.css">
+    <style>
+        .mode-option {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-option:hover {
+            border-color: var(--border-hover);
+        }
+        .mode-option.selected {
+            border-color: var(--accent-primary);
+            background: rgba(232, 168, 124, 0.1);
+        }
+        .mode-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 12px;
+            accent-color: var(--accent-primary);
+        }
+        .mode-option span {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        .param-slider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .param-slider label {
+            min-width: 120px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .param-slider input[type="range"] {
+            flex: 1;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--border-color);
+            border-radius: 3px;
+            border: none;
+        }
+        .param-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .param-slider .value {
+            min-width: 40px;
+            text-align: right;
+            color: var(--accent-primary);
+            font-weight: 600;
+            font-family: monospace;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
-        <h1>Module 3: Gradient, Edges, Corners & Segmentation</h1>
-        <a href="/dashboard" class="back-btn">Back to Dashboard</a>
+        <h1>Module 3: Feature Detection</h1>
+        <a href="/dashboard" class="back-btn">← Back</a>
     </div>
 
     <div class="container">
@@ -17,55 +81,44 @@
             <h2>Feature Detection</h2>
             <div class="info-box">
                 <strong>Comprehensive CV Analysis:</strong> Gradient magnitude & angle visualization, Laplacian of Gaussian (LoG), custom edge detection (NMS + Hysteresis), Harris corner detection, contour-based boundary detection, and ArUco marker segmentation.
-                <br><br>
-                <strong>Processing Modes:</strong>
-                <ul style="margin: 8px 0 0 20px; line-height: 1.8;">
-                    <li><strong>Gradient Magnitude:</strong> Shows edge strength using Sobel operator</li>
-                    <li><strong>Gradient Angle:</strong> Visualizes edge orientation in HSV color space</li>
-                    <li><strong>Laplacian of Gaussian:</strong> Gaussian blur + Laplacian for edge detection</li>
-                    <li><strong>Edge Detection:</strong> Custom implementation with NMS and hysteresis thresholding</li>
-                    <li><strong>Corner Detection:</strong> Harris corner detector with response visualization</li>
-                    <li><strong>Boundary Detection:</strong> Canny + morphological closing + contour analysis</li>
-                    <li><strong>ArUco Segmentation:</strong> Marker-based object boundary detection</li>
-                </ul>
             </div>
 
             <div class="stats">
                 <h3>Processing Mode</h3>
                 <div style="margin: 16px 0;">
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="gradient_mag" checked style="margin-right: 8px;">
+                    <label class="mode-option selected" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="gradient_mag" checked>
                         <span>Gradient Magnitude</span>
                     </label>
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="gradient_angle" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="gradient_angle">
                         <span>Gradient Angle (HSV)</span>
                     </label>
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="log" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="log">
                         <span>Laplacian of Gaussian</span>
                     </label>
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="edges" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="edges">
                         <span>Edge Detection (NMS + Hysteresis)</span>
                     </label>
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="corners" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="corners">
                         <span>Corner Detection (Harris)</span>
                     </label>
-                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
-                        <input type="radio" name="mode" value="boundary" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="boundary">
                         <span>Boundary Detection</span>
                     </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="radio" name="mode" value="aruco" style="margin-right: 8px;">
+                    <label class="mode-option" onclick="selectMode(this)">
+                        <input type="radio" name="mode" value="aruco">
                         <span>ArUco Segmentation</span>
                     </label>
                 </div>
             </div>
 
             <div class="controls">
-                <input type="file" id="imageInput" accept="image/*" onchange="loadImage(event)" style="display: none;">
+                <input type="file" id="imageInput" accept="image/*" onchange="loadImage(event)">
                 <button class="btn-primary" onclick="document.getElementById('imageInput').click()">Upload Image</button>
                 <button class="btn-secondary" onclick="processImage()">Process</button>
                 <button class="btn-secondary" onclick="downloadResult()">Download Result</button>
@@ -73,52 +126,50 @@
 
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill">0%</div>
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                 </div>
                 <div class="progress-text" id="progressText">Upload an image to begin...</div>
             </div>
 
             <div style="max-width: 900px; margin: 24px auto;">
-                <canvas id="canvas" style="width: 100%; border-radius: 12px; border: 2px solid rgba(0, 247, 255, 0.3); background: #0a0e27;"></canvas>
+                <canvas id="canvas" style="width: 100%;"></canvas>
             </div>
 
             <div class="stats">
                 <h3>Processing Parameters</h3>
-                <div id="params" style="display: grid; gap: 12px; margin-top: 12px;">
-                    <!-- Edge params -->
+                <div id="params" style="margin-top: 16px;">
                     <div id="edgeParams" style="display: none;">
-                        <div class="stat-item">
-                            <label class="stat-label">Gaussian Sigma:</label>
-                            <input type="range" id="edgeSigma" min="0.5" max="3.0" step="0.1" value="1.0" style="width: 150px; accent-color: #64ffda;">
-                            <span class="stat-value" id="edgeSigmaVal">1.0</span>
+                        <div class="param-slider">
+                            <label>Gaussian Sigma:</label>
+                            <input type="range" id="edgeSigma" min="0.5" max="3.0" step="0.1" value="1.0">
+                            <span class="value" id="edgeSigmaVal">1.0</span>
                         </div>
-                        <div class="stat-item">
-                            <label class="stat-label">Low Threshold:</label>
-                            <input type="range" id="edgeLow" min="5" max="100" step="1" value="15" style="width: 150px; accent-color: #64ffda;">
-                            <span class="stat-value" id="edgeLowVal">15</span>
+                        <div class="param-slider">
+                            <label>Low Threshold:</label>
+                            <input type="range" id="edgeLow" min="5" max="100" step="1" value="15">
+                            <span class="value" id="edgeLowVal">15</span>
                         </div>
-                        <div class="stat-item">
-                            <label class="stat-label">High Threshold:</label>
-                            <input type="range" id="edgeHigh" min="20" max="200" step="1" value="40" style="width: 150px; accent-color: #64ffda;">
-                            <span class="stat-value" id="edgeHighVal">40</span>
+                        <div class="param-slider">
+                            <label>High Threshold:</label>
+                            <input type="range" id="edgeHigh" min="20" max="200" step="1" value="40">
+                            <span class="value" id="edgeHighVal">40</span>
                         </div>
                     </div>
 
-                    <!-- Corner params -->
                     <div id="cornerParams" style="display: none;">
-                        <div class="stat-item">
-                            <label class="stat-label">Harris k (×100):</label>
-                            <input type="range" id="harrisK" min="1" max="10" step="1" value="4" style="width: 150px; accent-color: #64ffda;">
-                            <span class="stat-value" id="harrisKVal">4</span>
+                        <div class="param-slider">
+                            <label>Harris k (×100):</label>
+                            <input type="range" id="harrisK" min="1" max="10" step="1" value="4">
+                            <span class="value" id="harrisKVal">4</span>
                         </div>
-                        <div class="stat-item">
-                            <label class="stat-label">Threshold:</label>
-                            <input type="range" id="cornerTh" min="10" max="200" step="5" value="70" style="width: 150px; accent-color: #64ffda;">
-                            <span class="stat-value" id="cornerThVal">70</span>
+                        <div class="param-slider">
+                            <label>Threshold:</label>
+                            <input type="range" id="cornerTh" min="10" max="200" step="5" value="70">
+                            <span class="value" id="cornerThVal">70</span>
                         </div>
-                        <div class="stat-item">
-                            <label class="stat-label">Window Size:</label>
-                            <select id="harrisWin" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(100, 255, 218, 0.3); background: rgba(100, 255, 218, 0.05); color: #e2e8f0;">
+                        <div class="param-slider">
+                            <label>Window Size:</label>
+                            <select id="harrisWin">
                                 <option value="3">3×3</option>
                                 <option value="5" selected>5×5</option>
                                 <option value="7">7×7</option>
@@ -152,21 +203,21 @@
         let currentImage = null;
         let resultImage = null;
 
-        // Update parameter display
+        function selectMode(element) {
+            document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            element.querySelector('input').checked = true;
+            
+            const mode = element.querySelector('input').value;
+            document.getElementById('edgeParams').style.display = (mode === 'edges') ? 'block' : 'none';
+            document.getElementById('cornerParams').style.display = (mode === 'corners') ? 'block' : 'none';
+        }
+
         document.getElementById('edgeSigma').oninput = (e) => document.getElementById('edgeSigmaVal').textContent = e.target.value;
         document.getElementById('edgeLow').oninput = (e) => document.getElementById('edgeLowVal').textContent = e.target.value;
         document.getElementById('edgeHigh').oninput = (e) => document.getElementById('edgeHighVal').textContent = e.target.value;
         document.getElementById('harrisK').oninput = (e) => document.getElementById('harrisKVal').textContent = e.target.value;
         document.getElementById('cornerTh').oninput = (e) => document.getElementById('cornerThVal').textContent = e.target.value;
-
-        // Show/hide parameter controls based on mode
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const mode = radio.value;
-                document.getElementById('edgeParams').style.display = (mode === 'edges') ? 'block' : 'none';
-                document.getElementById('cornerParams').style.display = (mode === 'corners') ? 'block' : 'none';
-            });
-        });
 
         function loadImage(event) {
             const file = event.target.files[0];
@@ -181,7 +232,7 @@
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     currentImage = e.target.result;
                     document.getElementById('status').textContent = 'Image loaded. Click "Process" to analyze.';
-                    document.getElementById('status').style.color = '#64ffda';
+                    document.getElementById('status').style.color = 'var(--accent-secondary)';
                 };
                 img.src = e.target.result;
             };
@@ -190,7 +241,7 @@
 
         async function processImage() {
             if (!currentImage) {
-                alert('⚠️ Please upload an image first');
+                alert('Please upload an image first');
                 return;
             }
 
@@ -201,7 +252,6 @@
             
             progressContainer.classList.add('active');
             progressFill.style.width = '30%';
-            progressFill.textContent = '30%';
             progressText.textContent = 'Processing...';
 
             const params = {};
@@ -217,24 +267,15 @@
 
             try {
                 const startTime = performance.now();
-                
                 progressFill.style.width = '60%';
-                progressFill.textContent = '60%';
-
-                console.log('Processing request:', { mode, params });
 
                 const response = await fetch('/api/module3/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image: currentImage,
-                        mode: mode,
-                        params: params
-                    })
+                    body: JSON.stringify({ image: currentImage, mode: mode, params: params })
                 });
 
                 progressFill.style.width = '90%';
-                progressFill.textContent = '90%';
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -242,24 +283,16 @@
 
                 const data = await response.json();
                 
-                console.log('Processing response:', { 
-                    success: data.success, 
-                    hasImage: !!data.result_image,
-                    count: data.count,
-                    message: data.message
-                });
-                
                 if (data.success && data.result_image) {
                     const img = new Image();
                     img.onload = () => {
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         resultImage = data.result_image;
                         
-                        const endTime = performance.now();
-                        const processingTime = Math.round(endTime - startTime);
+                        const processingTime = Math.round(performance.now() - startTime);
                         
                         document.getElementById('status').textContent = data.message || 'Processing complete';
-                        document.getElementById('status').style.color = '#64ffda';
+                        document.getElementById('status').style.color = 'var(--accent-secondary)';
                         
                         if (data.count !== undefined && data.count !== null) {
                             document.getElementById('detectionCount').style.display = 'flex';
@@ -272,23 +305,18 @@
                         document.getElementById('timeVal').textContent = processingTime + 'ms';
                         
                         progressFill.style.width = '100%';
-                        progressFill.textContent = '100%';
                         progressText.textContent = 'Complete!';
                         setTimeout(() => progressContainer.classList.remove('active'), 1000);
                     };
-                    img.onerror = () => {
-                        throw new Error('Failed to load result image');
-                    };
+                    img.onerror = () => { throw new Error('Failed to load result image'); };
                     img.src = data.result_image;
                 } else {
-                    throw new Error(data.message || 'Processing failed - no result image returned');
+                    throw new Error(data.message || 'Processing failed');
                 }
             } catch (err) {
-                console.error('Processing error:', err);
-                document.getElementById('status').textContent = '❌ Error: ' + err.message;
-                document.getElementById('status').style.color = '#ff5252';
+                document.getElementById('status').textContent = 'Error: ' + err.message;
+                document.getElementById('status').style.color = 'var(--error)';
                 progressContainer.classList.remove('active');
-                alert('Processing failed: ' + err.message);
             }
         }
 
@@ -302,9 +330,7 @@
             const a = document.createElement('a');
             a.href = resultImage;
             a.download = `module3_${mode}_${Date.now()}.png`;
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
         }
     </script>
 </body>
